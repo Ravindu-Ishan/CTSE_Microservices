@@ -5,8 +5,14 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  // @Get()
+  // getHello(): string {
+  //   return this.appService.getHello();
+  // }
+
+  // In app.controller.ts or a dedicated health module
+  @Get('health')
+  health() {
+    return { status: 'ok' };
   }
 }

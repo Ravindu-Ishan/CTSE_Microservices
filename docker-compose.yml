@@ -1,0 +1,130 @@
+version: '3.8'
+
+# ============================================================
+# OTSS Local Development Stack
+#
+# Services:
+#   postgres      — single PostgreSQL instance, multiple schemas
+#   wso2-is       — WSO2 Identity Server 7.2 (built from repo)
+#   user-service  — OTSS User Service (NestJS, port 3010)
+#
+# Usage:
+#   cp .env.example .env          # fill in values
+#   docker compose up --build     # first run
+#   docker compose up             # subsequent runs
+#   docker compose down -v        # full teardown incl. volumes
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL — single instance, multiple schemas
+  # Schemas initialised via init scripts on first boot.
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: otss_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - otss_net
+
+  # ----------------------------------------------------------
+  # WSO2 Identity Server 7.2
+  # Built from WSO2_IAM_Docker_7.2/docker-compose/is/
+  # Config overlay mounted at wso2-config-volume.
+  # PostgreSQL JDBC jar expected at:
+  #   conf/identity-server/repository/lib/postgresql-*.jar
+  # ----------------------------------------------------------
+  wso2-is:
+    build:
+      context: ./WSO2_IAM_Docker_7.2/docker-compose/is
+      dockerfile: dockerfiles/is/Dockerfile
+    container_name: otss_wso2_is
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "9763:9763"
+      - "9443:9443"
+    volumes:
+      - ./WSO2_IAM_Docker_7.2/docker-compose/is/conf/identity-server:/home/wso2carbon/wso2-config-volume:ro
+      - ./WSO2_IAM_Docker_7.2/docker-compose/is/conf/identity-server/docker-entrypoint.sh:/home/wso2carbon/docker-entrypoint.sh:ro
+    environment:
+      # Passed through to deployment.toml via env substitution
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      WSO2_IS_ADMIN_PASSWORD: ${WSO2_IS_ADMIN_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sk https://localhost:9443/oauth2/token/.well-known/openid-configuration | grep -q issuer || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    networks:
+      - otss_net
+
+  # ----------------------------------------------------------
+  # OTSS User Service
+  # Built from OTSS_User_Service/
+  # Waits for both postgres and wso2-is to be healthy.
+  # ----------------------------------------------------------
+  user-service:
+    build:
+      context: ./OTSS_User_Service
+      dockerfile: Dockerfile
+    container_name: otss_user_service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wso2-is:
+        condition: service_healthy
+    ports:
+      - "3010:3010"
+    environment:
+      NODE_ENV: development
+      PORT: 3010
+
+      # Database — Prisma connection string
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+
+      # WSO2 SCIM2 base URL (internal Docker network name)
+      WSO2_SCIM_BASE_URL: https://wso2-is:9443/scim2
+      WSO2_CLIENT_ID: ${WSO2_CLIENT_ID}
+      WSO2_CLIENT_SECRET: ${WSO2_CLIENT_SECRET}
+      WSO2_END_USER_GROUP: OTS_END_USER
+      WSO2_WEBHOOK_SECRET: ${WSO2_WEBHOOK_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3010/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - otss_net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  otss_net:
+    driver: bridge
