@@ -1,0 +1,338 @@
+openapi: 3.1.0
+info:
+  title: OTSS User Service
+  version: 0.2.0
+  description: >
+    Manages user registration via WSO2 SCIM2, IAM-synced user profiles,
+    and support-staff availability data used by Queue/Ticket services.
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+paths:
+  /users/register:
+    post:
+      summary: Register a new end user
+      description: Provisions the user in WSO2 IS via SCIM2, then creates a local profile. Role is always END_USER.
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserDto'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Validation failed
+        '500':
+          description: WSO2 provisioning failed
+
+  /users/register/staff:
+    post:
+      summary: Register a new staff member
+      description: >
+        Provisions the user in WSO2 IS via SCIM2, then creates a local profile with STAFF role.
+        Requires admin authentication (AdminGuard — TODO).
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterStaffDto'
+      responses:
+        '201':
+          description: Staff member registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Validation failed
+        '401':
+          description: Unauthorized
+        '500':
+          description: WSO2 provisioning failed
+
+  /profiles:
+    get:
+      summary: List profiles
+      tags: [Profiles]
+      parameters:
+        - in: query
+          name: email
+          schema: { type: string, format: email }
+        - in: query
+          name: role
+          schema:
+            $ref: '#/components/schemas/UserRole'
+      responses:
+        '200':
+          description: Matching profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Profile'
+
+  /profiles/{id}:
+    get:
+      summary: Fetch a profile by ID
+      tags: [Profiles]
+      parameters:
+        - $ref: '#/components/parameters/ProfileId'
+      responses:
+        '200':
+          description: Profile found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404':
+          description: Profile not found
+
+  /staff:
+    get:
+      summary: Discover staff for assignment
+      tags: [Staff]
+      parameters:
+        - in: query
+          name: category
+          schema: { $ref: '#/components/schemas/TicketCategory' }
+        - in: query
+          name: isOnline
+          schema: { type: boolean }
+        - in: query
+          name: hasCapacity
+          schema: { type: boolean, description: Return only staff with load < maxLoad }
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Matching staff status rows with linked profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffStatusWithProfile'
+
+  /staff/isonline/{profileId}:
+    patch:
+      summary: Update staff availability and capacity
+      tags: [Staff]
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStaffStatusDto'
+      responses:
+        '200':
+          description: Updated staff status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffStatusWithProfile'
+        '404':
+          description: Staff profile missing or not marked as staff
+
+  /events/login:
+    post:
+      summary: WSO2 login event webhook
+      tags: [IAM Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudEventPayload'
+      responses:
+        '200':
+          description: Event processed
+
+  /events/session:
+    post:
+      summary: WSO2 session event webhook
+      tags: [IAM Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudEventPayload'
+      responses:
+        '200':
+          description: Event processed
+
+  /events/token:
+    post:
+      summary: WSO2 token event webhook
+      tags: [IAM Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudEventPayload'
+      responses:
+        '200':
+          description: Event processed
+
+  /events/credential:
+    post:
+      summary: WSO2 credential event webhook
+      tags: [IAM Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudEventPayload'
+      responses:
+        '200':
+          description: Event processed
+
+  /events/user-management:
+    post:
+      summary: WSO2 user management event webhook
+      tags: [IAM Events]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloudEventPayload'
+      responses:
+        '200':
+          description: Event processed
+
+components:
+  parameters:
+    ProfileId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    UserRole:
+      type: string
+      enum: [END_USER, STAFF, ADMIN]
+    TicketCategory:
+      type: string
+      enum: [IT, BILLING, ACCESS, OTHER]
+    RegisterUserDto:
+      type: object
+      required: [email, password, firstName, lastName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        firstName: { type: string }
+        lastName: { type: string }
+        phoneNumber: { type: string }
+        timezone: { type: string }
+        language: { type: string }
+      additionalProperties: false
+    RegisterStaffDto:
+      allOf:
+        - $ref: '#/components/schemas/RegisterUserDto'
+        - type: object
+          properties:
+            staff:
+              $ref: '#/components/schemas/StaffProfileInputDto'
+          additionalProperties: false
+    StaffProfileInputDto:
+      type: object
+      properties:
+        isOnline: { type: boolean }
+        currentLoad:
+          type: integer
+          minimum: 0
+        maxLoad:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/TicketCategory' }
+      additionalProperties: false
+    UpdateStaffStatusDto:
+      $ref: '#/components/schemas/StaffProfileInputDto'
+    Profile:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
+        phoneNumber: { type: string }
+        timezone: { type: string }
+        language: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        staffStatus:
+          $ref: '#/components/schemas/StaffStatus'
+      additionalProperties: false
+    StaffStatus:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        profileId: { type: string }
+        isOnline: { type: boolean }
+        currentLoad: { type: integer }
+        maxLoad: { type: integer }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/TicketCategory' }
+        updatedAt: { type: string, format: date-time }
+      additionalProperties: false
+    StaffStatusWithProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        profileId: { type: string }
+        isOnline: { type: boolean }
+        currentLoad: { type: integer }
+        maxLoad: { type: integer }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/TicketCategory' }
+        updatedAt: { type: string, format: date-time }
+        profile:
+          $ref: '#/components/schemas/Profile'
+      additionalProperties: false
+    CloudEventPayload:
+      type: object
+      description: WSO2 CloudEvents webhook payload
+      properties:
+        specversion: { type: string }
+        type: { type: string }
+        source: { type: string }
+        id: { type: string }
+        time: { type: string, format: date-time }
+        data: { type: object }
+      additionalProperties: true

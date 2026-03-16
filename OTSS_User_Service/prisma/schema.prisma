@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  END_USER
+  STAFF
+  ADMIN
+}
+
+enum TicketCategory {
+  IT
+  BILLING 
+  ACCESS
+  OTHER
+}
+
+model UserProfile {
+  id          String               @id
+  username    String               @unique
+  email       String               @unique
+  firstName   String
+  lastName    String
+  phoneNumber String?              @map("phone_number")
+  timezone    String?              @map("time_zone")
+  language    String?              @map("preferred_language")
+  role                   UserRole             @default(END_USER)
+  lastLoginAt            DateTime?            @map("last_login_at")
+  lastRegistrationAt     DateTime?            @map("last_registration_at")
+  lastTokenIssuedAt      DateTime?            @map("last_token_issued_at")
+  lastTokenRevokedAt     DateTime?            @map("last_token_revoked_at")
+  lastSessionActivityAt  DateTime?            @map("last_session_activity_at")
+  lastCredentialUpdateAt DateTime?            @map("last_credential_update_at")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  staffStatus            SupportStaffStatus?
+}
+
+model SupportStaffStatus {
+  id         String          @id @default(uuid()) @db.Uuid
+  profileId  String          @unique
+  profile    UserProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  isOnline   Boolean         @default(false) @map("is_online")
+  currentLoad Int            @default(0) @map("current_load")
+  maxLoad    Int             @default(5) @map("max_load")
+  categories TicketCategory[] @default([])
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+}

@@ -1,0 +1,19 @@
+version: '2.3'
+services:
+  identity-server:
+    build: ./dockerfiles/is
+    ports:
+      - "9763:9763"
+      - "9443:9443"
+      - "17171:17171"
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:9443/oauth2/token/.well-known/openid-configuration"]
+      interval: 5s
+      timeout: 120s
+      start_period: 100s
+    volumes:
+      - ./conf/identity-server:/home/wso2carbon/wso2-config-volume
+      - ./conf/identity-server/docker-entrypoint.sh:/home/wso2carbon/docker-entrypoint.sh:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+

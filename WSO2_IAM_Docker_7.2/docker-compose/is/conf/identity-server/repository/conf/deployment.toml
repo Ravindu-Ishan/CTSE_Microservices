@@ -1,0 +1,59 @@
+[server]
+hostname = "localhost"
+node_ip = "127.0.0.1"
+base_path = "https://$ref{server.hostname}:${carbon.management.port}"
+
+[super_admin]
+username = "admin"
+password = "admin"
+create_admin_account = true
+
+[user_store]
+type = "database_unique_id"
+
+[database.identity_db]
+url = "jdbc:postgresql://host.docker.internal:5432/wso2_iam?currentSchema=wso2_identity"
+username = "postgres"
+password = "admin"
+driver = "org.postgresql.Driver"
+[database.identity_db.pool_options]
+validationQuery = "SELECT 1"
+
+[database.shared_db]
+url = "jdbc:postgresql://host.docker.internal:5432/wso2_iam?currentSchema=wso2_shared"
+username = "postgres"
+password = "admin"
+driver = "org.postgresql.Driver"
+[database.shared_db.pool_options]
+validationQuery = "SELECT 1"
+
+[datasource.AgentIdentity]
+id = "AgentIdentity"
+url = "jdbc:postgresql://host.docker.internal:5432/wso2_iam?currentSchema=wso2_identity"
+username = "postgres"
+password = "admin"
+driver = "org.postgresql.Driver"
+[datasource.AgentIdentity.pool_options]
+validationQuery = "SELECT 1"
+
+[keystore.primary]
+file_name = "wso2carbon.p12"
+password = "wso2carbon"
+type="PKCS12"
+
+[truststore]
+file_name="client-truststore.p12"
+password="wso2carbon"
+type="PKCS12"
+
+[account_recovery.endpoint.auth]
+hash= "66cd9688a2ae068244ea01e70f0e230f5623b7fa4cdecb65070a09ec06452262"
+
+[identity.auth_framework.endpoint]
+app_password= "dashboard"
+
+[[console.extensions.outboundProvisioningConnectors]]
+connectorId="U2FtcGxl"
+description="Sample outbound provisioning connector"
+displayName="Sample outbound"
+icon="<network-resolvable-image-url>"
