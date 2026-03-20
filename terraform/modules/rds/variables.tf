@@ -10,6 +10,11 @@ variable "private_subnet_ids" {
   type = list(string)
 }
 
+variable "public_subnet_ids" {
+  type        = list(string)
+  description = "Public subnet IDs — required for publicly_accessible RDS"
+}
+
 variable "eks_node_sg_id" {
   type = string
 }
