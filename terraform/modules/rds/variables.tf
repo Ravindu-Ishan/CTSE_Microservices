@@ -15,10 +15,6 @@ variable "public_subnet_ids" {
   description = "Public subnet IDs — required for publicly_accessible RDS"
 }
 
-variable "eks_node_sg_id" {
-  type = string
-}
-
 variable "db_instance_class" {
   type = string
 }
