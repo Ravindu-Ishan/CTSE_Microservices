@@ -64,3 +64,8 @@ terraform/.terraform/
 terraform/terraform.tfvars
 terraform/*.tfstate
 terraform/*.tfstate.backup
+
+# WSO2 Helm chart — pulled from helm.wso2.com at deploy time, not committed
+# Only values-staging.yaml is committed (tracked explicitly below)
+kubernetes-is-7.2.0.1/*
+!kubernetes-is-7.2.0.1/values-staging.yaml

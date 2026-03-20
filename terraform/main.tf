@@ -1,6 +1,6 @@
 # ============================================================
 # Root — OTSS Infrastructure
-# Wires VPC → EKS → RDS → SSM modules together.
+# Wires VPC → EKS → RDS → SSM → myApplication modules.
 # ============================================================
 
 locals {
@@ -62,4 +62,18 @@ module "ssm" {
   wso2_client_id      = var.wso2_client_id
   wso2_client_secret  = var.wso2_client_secret
   wso2_webhook_secret = var.wso2_webhook_secret
+}
+
+# ----------------------------------------------------------------
+# myApplications — groups all OTSS resources in one console view
+# Enables Resource Explorer + AppRegistry application.
+# After applying: AWS Console → myApplications → otss-staging-app
+# ----------------------------------------------------------------
+module "myapplication" {
+  source = "./modules/myapplication"
+
+  name_prefix = local.name_prefix
+  project     = var.project
+  environment = var.environment
+  aws_region  = var.aws_region
 }

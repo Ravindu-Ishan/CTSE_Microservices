@@ -2,6 +2,10 @@
 # SSM Parameter Store Module
 # Stores all secrets as SecureString (KMS encrypted).
 # One database URL per microservice.
+#
+# DB name alignment:
+#   create-schemas.sql creates: otss_wso2_iam
+#   All WSO2 JDBC URLs point to: otss_wso2_iam (fixed from otss_wso2)
 # ============================================================
 
 locals {
@@ -84,20 +88,21 @@ resource "aws_ssm_parameter" "wso2_webhook_secret" {
   value = var.wso2_webhook_secret
 }
 
+# Fixed: DB name aligned with create-schemas.sql (otss_wso2_iam not otss_wso2)
 resource "aws_ssm_parameter" "wso2_identity_db_url" {
   name  = "${local.prefix}/wso2/identity-db-url"
   type  = "SecureString"
-  value = "jdbc:postgresql://${var.db_endpoint}:5432/otss_wso2?currentSchema=wso2_identity"
+  value = "jdbc:postgresql://${var.db_endpoint}:5432/otss_wso2_iam?currentSchema=wso2_identity"
 }
 
 resource "aws_ssm_parameter" "wso2_shared_db_url" {
   name  = "${local.prefix}/wso2/shared-db-url"
   type  = "SecureString"
-  value = "jdbc:postgresql://${var.db_endpoint}:5432/otss_wso2?currentSchema=wso2_shared"
+  value = "jdbc:postgresql://${var.db_endpoint}:5432/otss_wso2_iam?currentSchema=wso2_shared"
 }
 
 resource "aws_ssm_parameter" "wso2_consent_db_url" {
   name  = "${local.prefix}/wso2/consent-db-url"
   type  = "SecureString"
-  value = "jdbc:postgresql://${var.db_endpoint}:5432/otss_wso2?currentSchema=wso2_consent"
+  value = "jdbc:postgresql://${var.db_endpoint}:5432/otss_wso2_iam?currentSchema=wso2_consent"
 }
