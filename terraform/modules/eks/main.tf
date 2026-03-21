@@ -150,6 +150,55 @@ resource "aws_security_group" "eks_nodes" {
 }
 
 # ----------------------------------------------------------------
+# EBS CSI Driver — required for PersistentVolumeClaims using gp2/gp3
+# Without this addon, EBS volumes cannot be provisioned automatically.
+# This must be installed before any StatefulSet with PVCs is deployed.
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# IAM role for EBS CSI Driver
+# The controller pod uses IRSA (IAM Roles for Service Accounts)
+# to get permissions to create/attach/detach EBS volumes.
+# ----------------------------------------------------------------
+resource "aws_iam_role" "ebs_csi_driver" {
+  name = "${var.name_prefix}-ebs-csi-driver-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:aud" = "sts.amazonaws.com"
+          "${replace(aws_iam_openid_connect_provider.eks.url, "https://", "")}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
+  role       = aws_iam_role.ebs_csi_driver.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi_driver.arn
+
+  depends_on = [
+    aws_eks_node_group.wso2,
+    aws_eks_node_group.services,
+    aws_eks_node_group.kafka,
+    aws_iam_role_policy_attachment.ebs_csi_driver
+  ]
+}
+
+# ----------------------------------------------------------------
 # OIDC Provider — for EKS pod identity
 # ----------------------------------------------------------------
 data "tls_certificate" "eks_oidc" {

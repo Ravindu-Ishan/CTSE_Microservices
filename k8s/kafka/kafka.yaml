@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: kafka
   namespace: otss
   labels:
     app: kafka
 spec:
-  serviceName: kafka
   replicas: 1
   selector:
     matchLabels:
@@ -22,6 +21,13 @@ spec:
         - key: workload
           value: kafka
           effect: NoSchedule
+      # Disable K8s service env var injection — K8s auto-injects KAFKA_PORT
+      # from the kafka service which triggers the deprecated 'port' check in
+      # the cp-kafka entrypoint script, causing an immediate exit.
+      enableServiceLinks: false
+      # cp-kafka requires /etc/kafka/ to be writable — needs root
+      securityContext:
+        runAsUser: 0
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.6.0
@@ -57,6 +63,9 @@ spec:
               value: "true"
             - name: CLUSTER_ID
               value: "MkU3OEVBNTcwNTJENDM2Qk"
+            # Explicitly set log dirs to avoid deprecated port fallback
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data"
           resources:
             requests:
               memory: "512Mi"
@@ -67,6 +76,16 @@ spec:
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
+          # Wide startup window — KRaft storage formatting takes time
+          startupProbe:
+            exec:
+              command:
+                - kafka-broker-api-versions
+                - --bootstrap-server
+                - localhost:9092
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30   # 30 x 10s = 5 min window
           readinessProbe:
             exec:
               command:
@@ -75,7 +94,7 @@ spec:
                 - localhost:9092
             initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 10
+            failureThreshold: 5
           livenessProbe:
             exec:
               command:
@@ -85,16 +104,9 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 15
             failureThreshold: 3
-  volumeClaimTemplates:
-    - metadata:
-        name: kafka-data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        storageClassName: gp2
-        resources:
-          requests:
-            storage: 10Gi
+      volumes:
+        - name: kafka-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
