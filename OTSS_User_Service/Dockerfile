@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci 
 
 # ============================================================
 # Stage 2 - Prisma + Nest JS production build
