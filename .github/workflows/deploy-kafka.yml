@@ -42,6 +42,6 @@ jobs:
 
       - name: Verify Kafka
         run: |
-          kubectl rollout status statefulset/kafka \
+          kubectl rollout status deployment/kafka \
             -n ${{ env.HELM_NAMESPACE }} \
             --timeout=120s
