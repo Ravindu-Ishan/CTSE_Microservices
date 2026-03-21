@@ -20,7 +20,7 @@ deployment:
   # Use our GHCR image — open-source build, no WSO2 account needed
   image:
     registry: "ghcr.io"
-    repository: "Ravindu-Ishan/wso2-is"
+    repository: "ravindu-ishan/wso2-is"
     tag: "7.2.0"
     pullPolicy: "Always"
     imagePullSecret: ""
