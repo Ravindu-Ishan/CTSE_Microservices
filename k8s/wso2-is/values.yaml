@@ -69,6 +69,15 @@ deployment:
         -Djava.util.prefs.systemRoot=/home/wso2carbon/.java
         -Djava.util.prefs.userRoot=/home/wso2carbon/.java/.userPrefs
 
+  tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "wso2"
+    effect: "NoSchedule"
+
+  nodeSelector:
+    workload: "wso2"
+
   # WSO2 IS takes 2-3 min to start on t3.medium — widen the startup window
   startupProbe:
     initialDelaySeconds: 60

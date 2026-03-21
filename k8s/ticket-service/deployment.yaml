@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service
+  namespace: otss
+  labels:
+    app: ticket-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-service
+  template:
+    metadata:
+      labels:
+        app: ticket-service
+    spec:
+      nodeSelector:
+        nodegroup: services
+      containers:
+        - name: ticket-service
+          image: ghcr.io/ravindu-ishan/ticket-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3030
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3030"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: KAFKA_BROKERS
+              value: "kafka.otss.svc.cluster.local:9092"
+            - name: KAFKA_CLIENT_ID
+              value: "ticket-service"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ticket-service-secrets
+                  key: DATABASE_URL
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3030
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3030
+            initialDelaySeconds: 30
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-service
+  namespace: otss
+spec:
+  selector:
+    app: ticket-service
+  ports:
+    - port: 3030
+      targetPort: 3030
+  type: ClusterIP
