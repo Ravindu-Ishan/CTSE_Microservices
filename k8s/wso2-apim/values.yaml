@@ -113,12 +113,25 @@ wso2:
           websubHostname: "websub.wso2.com"
 
       security:
+        jksSecretName: "wso2-apim-keystore-secret"
         truststore:
           name: "client-truststore.jks"
           password: "wso2carbon"
         keystores:
+          primary:
+            enabled: false
+            name: "wso2carbon.jks"
+            alias: "wso2carbon"
+            password: "wso2carbon"
+            keyPassword: "wso2carbon"
           tls:
             enabled: true
+            name: "wso2carbon.jks"
+            alias: "wso2carbon"
+            password: "wso2carbon"
+            keyPassword: "wso2carbon"
+          internal:
+            enabled: false
             name: "wso2carbon.jks"
             alias: "wso2carbon"
             password: "wso2carbon"

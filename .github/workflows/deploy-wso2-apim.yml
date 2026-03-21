@@ -122,6 +122,19 @@ jobs:
           sed -i "s|<APIM_ADMIN_PASSWORD>|${{ secrets.APIM_ADMIN_PASSWORD }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<IMAGE_DIGEST>|${{ needs.build-and-push.outputs.image-digest }}|g" ${{ env.VALUES_FILE }}
 
+      - name: Extract default keystores from APIM image and create K8s secret
+        run: |
+          docker pull ghcr.io/ravindu-ishan/wso2-apim@${{ needs.build-and-push.outputs.image-digest }}
+          docker create --name apim-tmp ghcr.io/ravindu-ishan/wso2-apim@${{ needs.build-and-push.outputs.image-digest }}
+          docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/wso2carbon.jks ./wso2carbon.jks
+          docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/client-truststore.jks ./client-truststore.jks
+          docker rm apim-tmp
+          kubectl create secret generic wso2-apim-keystore-secret \
+            --from-file=wso2carbon.jks=./wso2carbon.jks \
+            --from-file=client-truststore.jks=./client-truststore.jks \
+            -n ${{ env.HELM_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Add WSO2 Helm repository
         run: |
           helm repo add wso2 https://helm.wso2.com
