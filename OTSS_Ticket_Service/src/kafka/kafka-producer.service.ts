@@ -11,7 +11,14 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
     const brokers = configService.getOrThrow<string>('KAFKA_BROKERS').split(',');
     const clientId = configService.get<string>('KAFKA_CLIENT_ID') ?? 'ticket-service';
 
-    const kafka = new Kafka({ clientId, brokers });
+    const kafka = new Kafka({
+      clientId,
+      brokers,
+      retry: {
+        initialRetryTime: 300,
+        retries: 10,
+      },
+    });
     this.producer = kafka.producer();
   }
 
