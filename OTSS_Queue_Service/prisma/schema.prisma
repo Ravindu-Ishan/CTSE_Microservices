@@ -1,13 +1,50 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum QueueEntryStatus {
+  PENDING      // ticket.created consumed, finding staff
+  ASSIGNED     // staff assigned, ticket IN_PROGRESS
+  COMPLETED    // ticket closed/resolved
+  FAILED       // could not assign — no available staff
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  IT
+  BILLING
+  ACCESS
+  OTHER
+}
+
+model QueueEntry {
+  id             String           @id @default(uuid()) @db.Uuid
+
+  ticketId       String           @unique @map("ticket_id")
+  ticketPriority TicketPriority   @map("ticket_priority") @default(MEDIUM)
+  ticketCategory TicketCategory   @map("ticket_category")
+  createdBy      String           @map("created_by")
+
+  assignedStaffId String?         @map("assigned_staff_id")
+  status          QueueEntryStatus @default(PENDING)
+
+  assignedAt     DateTime?        @map("assigned_at")
+  completedAt    DateTime?        @map("completed_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([ticketPriority])
+  @@index([assignedStaffId])
+  @@map("queue_entries")
 }
