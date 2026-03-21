@@ -127,7 +127,7 @@ wso2:
     image:
       registry: "ghcr.io"
       repository: "ravindu-ishan/wso2-apim"
-      digest: ""
+      tag: "4.6.0"
       imagePullPolicy: Always
       imagePullSecrets:
         enabled: false
