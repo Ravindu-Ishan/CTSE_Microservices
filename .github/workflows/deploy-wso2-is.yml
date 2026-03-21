@@ -1,16 +1,18 @@
 # ============================================================
 # WSO2 IS 7.2.0 — Build, Push, Deploy
 #
-# Triggers on push to main when any of these change:
-#   - WSO2 IS Docker source     → rebuilds and pushes image
+# Triggers on push to master when any of these change:
+#   - WSO2 IS Docker source          → rebuilds and pushes image
 #   - kubernetes-is-7.2.0.1/confs/** → deployment.toml template changed
-#   - k8s/wso2-is/**            → values or namespace changed
+#   - k8s/wso2-is/**                 → values or namespace changed
 #
 # Flow:
-#   1. Build custom WSO2 IS image (Alpine + JDK + WSO2 IS + PostgreSQL JDBC)
-#   2. Push to ghcr.io/Ravindu-Ishan/wso2-is:7.2.0
-#   3. Inject secrets into k8s/wso2-is/values.yaml
-#   4. helm upgrade using local chart + values.yaml override
+#   1. Build custom WSO2 IS image → push to GHCR
+#   2. Inject secrets into values.yaml
+#   3. helm upgrade --install (no --wait, no --atomic)
+#   4. kubectl patch to add nodeSelector + tolerations
+#      (chart template does not expose these as values)
+#   5. kubectl rollout status to wait for readiness
 #
 # Required GitHub Secrets:
 #   AWS_ROLE_ARN        — IAM role ARN for OIDC auth
@@ -126,20 +128,45 @@ jobs:
           helm repo update
 
       - name: Helm upgrade --install
+        # No --wait or --atomic here — we patch first then wait manually
+        # because the chart template has no nodeSelector/tolerations values,
+        # and the pod will stay Pending until the patch is applied.
         run: |
           helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
             wso2/identity-server \
             --version ${{ env.HELM_CHART_VERSION }} \
             --namespace ${{ env.HELM_NAMESPACE }} \
-            --values ${{ env.VALUES_FILE }} \
-            --timeout 10m \
-            --wait \
-            --atomic
+            --values ${{ env.VALUES_FILE }}
+
+      - name: Patch nodeSelector and tolerations
+        # The WSO2 IS Helm chart template does not expose nodeSelector or tolerations.
+        # Without this patch the pod stays Pending — it cannot tolerate the
+        # workload=wso2:NoSchedule taint on the wso2 node group.
+        run: |
+          kubectl patch deployment ${{ env.HELM_RELEASE_NAME }}-identity-server \
+            -n ${{ env.HELM_NAMESPACE }} \
+            --type=json \
+            -p='[
+              {
+                "op": "add",
+                "path": "/spec/template/spec/nodeSelector",
+                "value": {"nodegroup": "wso2"}
+              },
+              {
+                "op": "add",
+                "path": "/spec/template/spec/tolerations",
+                "value": [{"key": "workload", "operator": "Equal", "value": "wso2", "effect": "NoSchedule"}]
+              }
+            ]'
+
+      - name: Wait for rollout
+        # WSO2 IS takes 3-5 min to start on t3.medium — give it 15 min
+        run: |
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-identity-server \
+            -n ${{ env.HELM_NAMESPACE }} \
+            --timeout=900s
 
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }} \
-            -n ${{ env.HELM_NAMESPACE }} \
-            --timeout=600s
           kubectl get pods -n ${{ env.HELM_NAMESPACE }} \
             -l app.kubernetes.io/name=identity-server

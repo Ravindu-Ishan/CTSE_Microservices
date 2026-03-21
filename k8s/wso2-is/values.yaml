@@ -15,15 +15,6 @@ wso2:
     username: ""
     password: ""
 
-nodeSelector:
-  workload: "wso2"
-  
-tolerations:
-- key: "workload"
-  operator: "Equal"
-  value: "wso2"
-  effect: "NoSchedule"
-
 deployment:
 
   # Use our GHCR image — open-source build, no WSO2 account needed
