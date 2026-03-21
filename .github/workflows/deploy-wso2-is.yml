@@ -1,19 +1,26 @@
 # ============================================================
 # WSO2 IS 7.2.0 — Build, Push, Deploy
 #
-# Triggers:
-#   - Push to main that touches WSO2 IS source files
-#   - Manual dispatch
+# Triggers on push to main when any of these change:
+#   - WSO2 IS Docker source     → rebuilds and pushes image
+#   - kubernetes-is-7.2.0.1/confs/** → deployment.toml template changed
+#   - k8s/wso2-is/**            → values or namespace changed
+#
+# Flow:
+#   1. Build custom WSO2 IS image (Alpine + JDK + WSO2 IS + PostgreSQL JDBC)
+#   2. Push to ghcr.io/Ravindu-Ishan/wso2-is:7.2.0
+#   3. Inject secrets into k8s/wso2-is/values.yaml
+#   4. helm upgrade using local chart + values.yaml override
 #
 # Required GitHub Secrets:
-#   AWS_ROLE_ARN        — ARN of the GitHub Actions IAM role from Terraform
+#   AWS_ROLE_ARN        — IAM role ARN for OIDC auth
 #   RDS_ENDPOINT        — from: terraform output rds_endpoint
 #   DB_PASSWORD         — RDS master password
 #   WSO2_ADMIN_PASSWORD — WSO2 IS admin password
 #
 # Required GitHub Variables:
-#   AWS_REGION          — ap-southeast-1
-#   EKS_CLUSTER_NAME    — otss-staging-cluster
+#   AWS_REGION       — ap-southeast-1
+#   EKS_CLUSTER_NAME — otss-staging-cluster
 # ============================================================
 
 name: Deploy WSO2 IS
@@ -21,10 +28,11 @@ name: Deploy WSO2 IS
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - 'WSO2_IAM_Docker_7.2/**'
-      - 'kubernetes-is-7.2.0.1/values-staging.yaml'
+      - 'kubernetes-is-7.2.0.1/confs/**'
+      - 'k8s/wso2-is/**'
       - '.github/workflows/deploy-wso2-is.yml'
   workflow_dispatch:
 
@@ -34,8 +42,8 @@ env:
   IMAGE_TAG: "7.2.0"
   HELM_RELEASE_NAME: wso2-is
   HELM_NAMESPACE: otss
-  HELM_CHART_VERSION: "7.2.0-1"
-  VALUES_FILE: ./kubernetes-is-7.2.0.1/values-staging.yaml
+  HELM_CHART_PATH: ./kubernetes-is-7.2.0.1
+  VALUES_FILE: ./k8s/wso2-is/values.yaml
 
 jobs:
 
@@ -92,7 +100,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: GitHubActions-WSO2IS-Deploy
 
-      - name: Update kubeconfig for EKS cluster
+      - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig \
             --region ${{ vars.AWS_REGION }} \
@@ -103,27 +111,19 @@ jobs:
         with:
           version: 'v3.14.0'
 
-      - name: Add WSO2 Helm repository
-        run: |
-          helm repo add wso2 https://helm.wso2.com
-          helm repo update
-
-      - name: Create namespace if not exists
+      - name: Create namespace
         run: kubectl apply -f k8s/namespace.yaml
 
       - name: Inject secrets into values file
-        # Replaces placeholders with real values from GitHub Secrets.
-        # Values are never stored in the repo.
         run: |
           sed -i "s|<RDS_ENDPOINT>|${{ secrets.RDS_ENDPOINT }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<DB_PASSWORD>|${{ secrets.DB_PASSWORD }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<WSO2_ADMIN_PASSWORD>|${{ secrets.WSO2_ADMIN_PASSWORD }}|g" ${{ env.VALUES_FILE }}
 
-      - name: Helm upgrade --install WSO2 IS
+      - name: Helm upgrade --install
         run: |
           helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
-            wso2/identity-server \
-            --version ${{ env.HELM_CHART_VERSION }} \
+            ${{ env.HELM_CHART_PATH }} \
             --namespace ${{ env.HELM_NAMESPACE }} \
             --values ${{ env.VALUES_FILE }} \
             --timeout 10m \

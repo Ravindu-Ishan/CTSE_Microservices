@@ -179,7 +179,7 @@ resource "aws_iam_role" "github_actions" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:*:ref:refs/heads/master"
+          "token.actions.githubusercontent.com:sub" = "repo:Ravindu-Ishan/CTSE_Microservices:ref:refs/heads/master"
         }
       }
     }]
