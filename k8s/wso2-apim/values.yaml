@@ -127,11 +127,9 @@ wso2:
     image:
       registry: "ghcr.io"
       repository: "ravindu-ishan/wso2-apim"
-      # Must explicitly set digest to null to prevent chart default
-      # empty string "" from being used — empty string is truthy in
-      # Go templates and produces invalid image ref: registry/repo@
-      digest: ~
-      tag: "4.6.0"
+      # Digest is injected by the pipeline after the Docker build completes
+      # Format: sha256:abc123... (injected via sed in deploy workflow)
+      digest: "<IMAGE_DIGEST>"
       imagePullPolicy: Always
       imagePullSecrets:
         enabled: false

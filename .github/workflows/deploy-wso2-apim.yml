@@ -51,6 +51,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout repository
@@ -67,6 +69,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push WSO2 APIM image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: ./WSO2_APIM_Docker_4.6.0.2/dockerfiles/alpine/apim
@@ -78,6 +81,9 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
           platforms: linux/amd64
+
+      - name: Export image digest
+        run: echo "APIM_IMAGE_DIGEST=${{ steps.build.outputs.digest }}" >> $GITHUB_ENV
 
   deploy:
     name: Helm Deploy to EKS
@@ -109,11 +115,12 @@ jobs:
         with:
           version: 'v3.14.0'
 
-      - name: Inject secrets into values file
+      - name: Inject secrets and image digest into values file
         run: |
           sed -i "s|<RDS_ENDPOINT>|${{ secrets.RDS_ENDPOINT }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<DB_PASSWORD>|${{ secrets.DB_PASSWORD }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<APIM_ADMIN_PASSWORD>|${{ secrets.APIM_ADMIN_PASSWORD }}|g" ${{ env.VALUES_FILE }}
+          sed -i "s|<IMAGE_DIGEST>|${{ needs.build-and-push.outputs.image-digest }}|g" ${{ env.VALUES_FILE }}
 
       - name: Add WSO2 Helm repository
         run: |
@@ -126,9 +133,7 @@ jobs:
             wso2/wso2am-all-in-one \
             --version ${{ env.HELM_CHART_VERSION }} \
             --namespace ${{ env.HELM_NAMESPACE }} \
-            --values ${{ env.VALUES_FILE }} \
-            --set wso2.deployment.image.digest=null \
-            --set wso2.deployment.image.tag=4.6.0
+            --values ${{ env.VALUES_FILE }}
 
       - name: Patch nodeSelector and tolerations
         # The APIM Helm chart exposes nodeSelector as a value so this
