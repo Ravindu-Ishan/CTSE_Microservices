@@ -11,7 +11,7 @@
 # ----------------------------------------------------------------
 resource "aws_db_subnet_group" "main" {
   name       = "${var.name_prefix}-db-subnet-group"
-  subnet_ids = concat(var.public_subnet_ids, var.private_subnet_ids)
+  subnet_ids = var.public_subnet_ids
 
   tags = {
     Name = "${var.name_prefix}-db-subnet-group"
