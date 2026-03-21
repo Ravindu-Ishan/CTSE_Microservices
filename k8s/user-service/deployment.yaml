@@ -35,7 +35,7 @@ spec:
             - name: WSO2_END_USER_GROUP
               value: "OTS_END_USER"
             - name: WSO2_SCIM_BASE_URL
-              value: "https://wso2-is.otss.svc.cluster.local:9443"
+              value: "https://wso2-is-identity-server.otss.svc.cluster.local:9443"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
