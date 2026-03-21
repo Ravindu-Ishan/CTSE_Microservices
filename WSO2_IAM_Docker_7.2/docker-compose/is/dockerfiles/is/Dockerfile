@@ -98,7 +98,7 @@ RUN \
     && chown -R ${USER}:${USER_GROUP} ${USER_HOME}/.java
 
 # Copy init script to user home.
-COPY --chown=wso2carbon:wso2 docker-entrypoint.sh ${USER_HOME}/
+COPY --chown=wso2carbon:wso2 conf/identity-server/docker-entrypoint.sh ${USER_HOME}/
 
 # Install required packages.
 RUN \
