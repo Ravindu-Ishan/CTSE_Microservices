@@ -1,0 +1,173 @@
+# ============================================================
+# WSO2 APIM 4.6.0 — Helm Values Override (Staging / AWS EKS)
+#
+# Only contains overrides from chart defaults.
+# Everything not listed here uses the chart default values.yaml.
+#
+# Deploy:
+#   helm upgrade --install wso2-apim ./helm-apim-all-in-one-4.6.0-2/all-in-one \
+#     -f k8s/wso2-apim/values.yaml \
+#     -n otss
+#
+# Secrets injected by pipeline:
+#   <RDS_ENDPOINT>        — RDS hostname
+#   <DB_PASSWORD>         — RDS master password
+#   <APIM_ADMIN_PASSWORD> — WSO2 APIM admin password
+# ============================================================
+
+# Disable cloud provider specific features
+aws:
+  enabled: false
+azure:
+  enabled: false
+gcp:
+  enabled: false
+
+kubernetes:
+  # Use ALB ingress class (same as WSO2 IS)
+  ingressClass: "alb"
+  ingress:
+    management:
+      enabled: true
+      hostname: "wso2apim.otss.internal"
+      annotations:
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+        nginx.ingress.kubernetes.io/affinity: "cookie"
+        nginx.ingress.kubernetes.io/session-cookie-name: "route"
+        nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+    gateway:
+      enabled: true
+      hostname: "wso2apim-gw.otss.internal"
+      annotations:
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+        nginx.ingress.kubernetes.io/proxy-buffering: "on"
+        nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    websocket:
+      enabled: false
+    websub:
+      enabled: false
+
+  securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+    seLinux:
+      enabled: false
+    seccompProfile:
+      type: RuntimeDefault
+
+wso2:
+  apim:
+    secureVaultEnabled: false
+    configurations:
+      adminUsername: "admin"
+      adminPassword: "<APIM_ADMIN_PASSWORD>"
+
+      databases:
+        type: "postgre"
+        jdbc:
+          driver: "org.postgresql.Driver"
+        apim_db:
+          url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_apim?currentSchema=wso2_apimgt"
+          username: "otssadmin"
+          password: "<DB_PASSWORD>"
+          poolParameters:
+            defaultAutoCommit: true
+            testOnBorrow: true
+            testWhileIdle: true
+            validationInterval: 30000
+            maxActive: 100
+            maxWait: 60000
+            minIdle: 5
+        shared_db:
+          url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_apim?currentSchema=wso2_shared"
+          username: "otssadmin"
+          password: "<DB_PASSWORD>"
+          poolParameters:
+            defaultAutoCommit: true
+            testOnBorrow: true
+            testWhileIdle: true
+            validationInterval: 30000
+            maxActive: 100
+            maxWait: 60000
+            minIdle: 5
+
+      # Configure WSO2 IS as the external Key Manager
+      iskm:
+        enabled: true
+        serviceName: "wso2-is-identity-server"
+        revokeURL: "https://wso2-is-identity-server.otss.svc.cluster.local:9443/oauth2/revoke"
+
+      gateway:
+        environments:
+        - name: "Default"
+          type: "hybrid"
+          gatewayType: "Regular"
+          provider: "wso2"
+          displayInApiConsole: true
+          description: "Default gateway for OTSS microservices"
+          showAsTokenEndpointUrl: true
+          serviceName: "wso2am-gateway-service"
+          servicePort: 9443
+          wsHostname: "websocket.wso2.com"
+          httpHostname: "wso2apim-gw.otss.internal"
+          websubHostname: "websub.wso2.com"
+
+      # Disable unused features
+      ai:
+        enabled: false
+      openTracer:
+        enabled: false
+      openTelemetry:
+        enabled: false
+      workflow:
+        enable: false
+
+  deployment:
+    # Use our custom GHCR image with PostgreSQL JDBC driver baked in
+    image:
+      registry: "ghcr.io"
+      repository: "ravindu-ishan/wso2-apim"
+      digest: ""
+      imagePullPolicy: Always
+      imagePullSecrets:
+        enabled: false
+
+    # Tuned for t3.medium (2 vCPU / 4GB RAM)
+    # Sharing node with WSO2 IS — reduced from defaults
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1500m"
+      jvm:
+        memory:
+          xms: "1024m"
+          xmx: "1536m"
+
+    # WSO2 APIM takes 3-5 min to start — widen startup window
+    startupProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      failureThreshold: 60   # 60 x 10s = 10 min window
+
+    readinessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 15
+      failureThreshold: 3
+
+    livenessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 15
+      failureThreshold: 3
+
+    # Pin to wso2 node group — same node as WSO2 IS
+    nodeSelector:
+      nodegroup: "wso2"
+
+    persistence:
+      solrIndexing:
+        enabled: false
+
+    highAvailability: false

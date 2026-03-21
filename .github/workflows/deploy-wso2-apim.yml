@@ -1,0 +1,157 @@
+# ============================================================
+# WSO2 APIM 4.6.0 — Build, Push, Deploy
+#
+# Triggers on push to master when any of these change:
+#   - WSO2 APIM Docker source   → rebuilds and pushes image
+#   - k8s/wso2-apim/**          → values changed
+#
+# Flow:
+#   1. Build custom WSO2 APIM image (Alpine + JDK21 + WSO2 APIM + PostgreSQL JDBC)
+#   2. Push to ghcr.io/ravindu-ishan/wso2-apim:4.6.0
+#   3. Inject secrets into k8s/wso2-apim/values.yaml
+#   4. helm upgrade using local chart + values.yaml override
+#
+# Required GitHub Secrets:
+#   AWS_ROLE_ARN        — IAM role ARN for OIDC auth
+#   RDS_ENDPOINT        — from: terraform output rds_endpoint
+#   DB_PASSWORD         — RDS master password
+#   APIM_ADMIN_PASSWORD — WSO2 APIM admin password
+#
+# Required GitHub Variables:
+#   AWS_REGION       — ap-southeast-1
+#   EKS_CLUSTER_NAME — otss-staging-cluster
+# ============================================================
+
+name: Deploy WSO2 APIM
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'WSO2_APIM_Docker_4.6.0.2/**'
+      - 'k8s/wso2-apim/**'
+      - '.github/workflows/deploy-wso2-apim.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/ravindu-ishan/wso2-apim
+  IMAGE_TAG: "4.6.0"
+  HELM_RELEASE_NAME: wso2-apim
+  HELM_NAMESPACE: otss
+  HELM_CHART_VERSION: "4.6.0-1"
+  VALUES_FILE: ./k8s/wso2-apim/values.yaml
+
+jobs:
+
+  build-and-push:
+    name: Build & Push WSO2 APIM Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push WSO2 APIM image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./WSO2_APIM_Docker_4.6.0.2/dockerfiles/alpine/apim
+          file: ./WSO2_APIM_Docker_4.6.0.2/dockerfiles/alpine/apim/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+          platforms: linux/amd64
+
+  deploy:
+    name: Helm Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: GitHubActions-WSOAPIS-Deploy
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ vars.AWS_REGION }} \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.14.0'
+
+      - name: Inject secrets into values file
+        run: |
+          sed -i "s|<RDS_ENDPOINT>|${{ secrets.RDS_ENDPOINT }}|g" ${{ env.VALUES_FILE }}
+          sed -i "s|<DB_PASSWORD>|${{ secrets.DB_PASSWORD }}|g" ${{ env.VALUES_FILE }}
+          sed -i "s|<APIM_ADMIN_PASSWORD>|${{ secrets.APIM_ADMIN_PASSWORD }}|g" ${{ env.VALUES_FILE }}
+
+      - name: Add WSO2 Helm repository
+        run: |
+          helm repo add wso2 https://helm.wso2.com
+          helm repo update
+
+      - name: Helm upgrade --install
+        run: |
+          helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
+            wso2/wso2am-all-in-one \
+            --version ${{ env.HELM_CHART_VERSION }} \
+            --namespace ${{ env.HELM_NAMESPACE }} \
+            --values ${{ env.VALUES_FILE }}
+
+      - name: Patch nodeSelector and tolerations
+        # The APIM Helm chart exposes nodeSelector as a value so this
+        # is already set in values.yaml. However toleration for the
+        # wso2 taint still needs to be patched since the chart
+        # does not expose tolerations as a value.
+        run: |
+          kubectl patch deployment ${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one \
+            -n ${{ env.HELM_NAMESPACE }} \
+            --type=json \
+            -p='[
+              {
+                "op": "add",
+                "path": "/spec/template/spec/tolerations",
+                "value": [{"key": "workload", "operator": "Equal", "value": "wso2", "effect": "NoSchedule"}]
+              }
+            ]'
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one \
+            -n ${{ env.HELM_NAMESPACE }} \
+            --timeout=900s
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n ${{ env.HELM_NAMESPACE }} \
+            -l app.kubernetes.io/name=wso2am-all-in-one
