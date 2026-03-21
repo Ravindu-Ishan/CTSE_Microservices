@@ -1,0 +1,94 @@
+name: Deploy Notification Service
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'OTSS_Notification_Service/**'
+      - 'k8s/notification-service/**'
+      - '.github/workflows/deploy-notification-service.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/ravindu-ishan/notification-service
+  NAMESPACE: otss
+
+jobs:
+  build-and-push:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./OTSS_Notification_Service
+          file: ./OTSS_Notification_Service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+          platforms: linux/amd64
+
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: GitHubActions-NotificationService-Deploy
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ vars.AWS_REGION }} \
+            --name ${{ vars.EKS_CLUSTER_NAME }}
+
+      - name: Create K8s secret
+        run: |
+          kubectl create secret generic notification-service-secrets \
+            --namespace=${{ env.NAMESPACE }} \
+            --from-literal=DATABASE_URL="${{ secrets.NOTIFICATION_SERVICE_DB_URL }}" \
+            --from-literal=GMAIL_USER="${{ secrets.GMAIL_USER }}" \
+            --from-literal=GMAIL_APP_PASSWORD="${{ secrets.GMAIL_APP_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy notification service
+        run: kubectl apply -f k8s/notification-service/deployment.yaml
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/notification-service \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=120s
