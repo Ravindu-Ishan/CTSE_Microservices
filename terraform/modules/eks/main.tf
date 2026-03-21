@@ -150,8 +150,7 @@ resource "aws_security_group" "eks_nodes" {
 }
 
 # ----------------------------------------------------------------
-# OIDC Provider — enables GitHub Actions to assume IAM roles
-# without long-lived AWS access keys (more secure)
+# OIDC Provider — for EKS pod identity
 # ----------------------------------------------------------------
 data "tls_certificate" "eks_oidc" {
   url = aws_eks_cluster.main.identity[0].oidc[0].issuer
@@ -161,6 +160,17 @@ resource "aws_iam_openid_connect_provider" "eks" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
   url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+# ----------------------------------------------------------------
+# OIDC Provider — for GitHub Actions
+# Required for GitHub Actions to assume IAM roles without
+# long-lived AWS access keys.
+# ----------------------------------------------------------------
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1", "1c58a3a8518e8759bf075b76b750d4f2df264fcd"]
 }
 
 # ----------------------------------------------------------------
@@ -209,6 +219,37 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       }
     ]
   })
+}
+
+# ----------------------------------------------------------------
+# aws-auth ConfigMap — grants GitHub Actions role access to EKS
+# This is recreated automatically on every terraform apply so
+# tearing down and recreating the cluster never breaks the pipeline.
+# ----------------------------------------------------------------
+resource "kubernetes_config_map_v1_data" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+
+  force = true
+
+  data = {
+    mapRoles = yamlencode([
+      {
+        rolearn  = aws_iam_role.eks_node.arn
+        username = "system:node:{{EC2PrivateDNSName}}"
+        groups   = ["system:bootstrappers", "system:nodes"]
+      },
+      {
+        rolearn  = aws_iam_role.github_actions.arn
+        username = "github-actions"
+        groups   = ["system:masters"]
+      }
+    ])
+  }
+
+  depends_on = [aws_eks_cluster.main]
 }
 
 # ----------------------------------------------------------------
