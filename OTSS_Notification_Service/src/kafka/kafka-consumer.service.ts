@@ -16,7 +16,16 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
     const brokers  = configService.getOrThrow<string>('KAFKA_BROKERS').split(',');
     const clientId = configService.get<string>('KAFKA_CLIENT_ID') ?? 'notification-service';
 
-    const kafka = new Kafka({ clientId, brokers });
+    const kafka = new Kafka({
+      clientId,
+      brokers,
+      // Suppress the negative timeout warning and handle
+      // startup race conditions gracefully
+      retry: {
+        initialRetryTime: 300,
+        retries: 10,
+      },
+    });
     this.consumer = kafka.consumer({ groupId: KAFKA_CONSUMER_GROUP });
   }
 
