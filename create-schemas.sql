@@ -2,9 +2,9 @@
 -- OTSS Microservice databases
 -- ----------------------------------------------------------------
 CREATE DATABASE otss_user_service;
---CREATE DATABASE otss_ticket_service;
---CREATE DATABASE otss_queue_service;
---CREATE DATABASE otss_notification_service;
+CREATE DATABASE otss_ticket_service;
+CREATE DATABASE otss_queue_service;
+CREATE DATABASE otss_notification_service;
 
 -- ----------------------------------------------------------------
 -- WSO2 Identity Server database
