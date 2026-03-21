@@ -151,22 +151,19 @@ jobs:
             --namespace ${{ env.HELM_NAMESPACE }} \
             --values ${{ env.VALUES_FILE }}
 
-      - name: Patch nodeSelector and tolerations
-        # The APIM Helm chart exposes nodeSelector as a value so this
-        # is already set in values.yaml. However toleration for the
-        # wso2 taint still needs to be patched since the chart
-        # does not expose tolerations as a value.
+      - name: Patch tolerations onto APIM deployment
+        # The APIM Helm chart has no tolerations support in its template.
+        # We must patch it directly after every helm upgrade.
+        # Uses a retry loop to handle timing between helm deploy and patch.
         run: |
-          kubectl patch deployment ${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one-am-deployment-1 \
-            -n ${{ env.HELM_NAMESPACE }} \
-            --type=json \
-            -p='[
-              {
-                "op": "add",
-                "path": "/spec/template/spec/tolerations",
-                "value": [{"key": "workload", "operator": "Equal", "value": "wso2", "effect": "NoSchedule"}]
-              }
-            ]'
+          for i in 1 2 3; do
+            kubectl patch deployment ${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one-am-deployment-1 \
+              -n ${{ env.HELM_NAMESPACE }} \
+              --type=merge \
+              -p '{"spec":{"template":{"spec":{"tolerations":[{"key":"workload","operator":"Equal","value":"wso2","effect":"NoSchedule"}]}}}}' \
+            && echo "Patch applied successfully" && break \
+            || echo "Patch attempt $i failed, retrying in 5s..." && sleep 5
+          done
 
       - name: Wait for rollout
         run: |
