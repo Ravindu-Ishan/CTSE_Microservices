@@ -25,6 +25,12 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+variable "enable_nat_gateway" {
+  description = "Set false when EKS is not running to eliminate NAT Gateway cost"
+  type        = bool
+  default     = true
+}
+
 # ----------------------------------------------------------------
 # EKS
 # ----------------------------------------------------------------

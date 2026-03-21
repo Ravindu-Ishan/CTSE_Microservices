@@ -13,9 +13,10 @@ locals {
 module "vpc" {
   source = "./modules/vpc"
 
-  name_prefix = local.name_prefix
-  aws_region  = var.aws_region
-  vpc_cidr    = var.vpc_cidr
+  name_prefix        = local.name_prefix
+  aws_region         = var.aws_region
+  vpc_cidr           = var.vpc_cidr
+  enable_nat_gateway = var.enable_nat_gateway
 }
 
 # ----------------------------------------------------------------
@@ -42,7 +43,7 @@ module "rds" {
   name_prefix        = local.name_prefix
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
-  eks_node_sg_id     = module.eks.node_security_group_id
+  public_subnet_ids  = module.vpc.public_subnet_ids
   db_instance_class  = var.db_instance_class
   db_username        = var.db_username
   db_password        = var.db_password
