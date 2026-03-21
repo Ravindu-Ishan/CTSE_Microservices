@@ -127,6 +127,8 @@ wso2:
     image:
       registry: "ghcr.io"
       repository: "ravindu-ishan/wso2-apim"
+      # tag is used — do NOT add digest key at all (even empty string
+      # is truthy in Go templates and will break the image reference)
       tag: "4.6.0"
       imagePullPolicy: Always
       imagePullSecrets:

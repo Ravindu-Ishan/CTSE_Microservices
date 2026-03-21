@@ -9,7 +9,7 @@
 #   1. Build custom WSO2 APIM image (Alpine + JDK21 + WSO2 APIM + PostgreSQL JDBC)
 #   2. Push to ghcr.io/ravindu-ishan/wso2-apim:4.6.0
 #   3. Inject secrets into k8s/wso2-apim/values.yaml
-#   4. helm upgrade using local chart + values.yaml override
+#   4. helm upgrade using remote wso2/wso2am-all-in-one chart from helm.wso2.com
 #
 # Required GitHub Secrets:
 #   AWS_ROLE_ARN        — IAM role ARN for OIDC auth
@@ -40,7 +40,7 @@ env:
   IMAGE_TAG: "4.6.0"
   HELM_RELEASE_NAME: wso2-apim
   HELM_NAMESPACE: otss
-  HELM_CHART_VERSION: "4.6.0-1"
+  HELM_CHART_VERSION: "4.6.0-2"
   VALUES_FILE: ./k8s/wso2-apim/values.yaml
 
 jobs:
