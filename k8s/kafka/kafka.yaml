@@ -87,20 +87,14 @@ spec:
             periodSeconds: 10
             failureThreshold: 30   # 30 x 10s = 5 min window
           readinessProbe:
-            exec:
-              command:
-                - kafka-broker-api-versions
-                - --bootstrap-server
-                - localhost:9092
+            tcpSocket:
+              port: 9092
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 5
           livenessProbe:
-            exec:
-              command:
-                - kafka-broker-api-versions
-                - --bootstrap-server
-                - localhost:9092
+            tcpSocket:
+              port: 9092
             initialDelaySeconds: 60
             periodSeconds: 15
             failureThreshold: 3
