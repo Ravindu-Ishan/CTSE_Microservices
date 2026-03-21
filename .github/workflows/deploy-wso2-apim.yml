@@ -126,7 +126,9 @@ jobs:
             wso2/wso2am-all-in-one \
             --version ${{ env.HELM_CHART_VERSION }} \
             --namespace ${{ env.HELM_NAMESPACE }} \
-            --values ${{ env.VALUES_FILE }}
+            --values ${{ env.VALUES_FILE }} \
+            --set wso2.deployment.image.digest=null \
+            --set wso2.deployment.image.tag=4.6.0
 
       - name: Patch nodeSelector and tolerations
         # The APIM Helm chart exposes nodeSelector as a value so this
