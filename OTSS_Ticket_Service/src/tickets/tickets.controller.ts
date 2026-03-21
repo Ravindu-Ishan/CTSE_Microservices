@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CreateMessageDto } from './dto/create-message.dto';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { TicketFilterDto } from './dto/ticket-filter.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -50,5 +51,20 @@ export class TicketsController {
   @ApiOperation({ summary: 'Close a ticket' })
   close(@Param('id', ParseUUIDPipe) id: string) {
     return this.ticketsService.close(id);
+  }
+
+  @Post(':id/messages')
+  @ApiOperation({ summary: 'Post a message on a ticket — used by both end users and staff' })
+  addMessage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateMessageDto,
+  ) {
+    return this.ticketsService.addMessage(id, dto);
+  }
+
+  @Get(':id/messages')
+  @ApiOperation({ summary: 'Get full conversation thread for a ticket' })
+  getMessages(@Param('id', ParseUUIDPipe) id: string) {
+    return this.ticketsService.getMessages(id);
   }
 }

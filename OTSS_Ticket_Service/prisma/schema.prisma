@@ -42,5 +42,27 @@ model Ticket {
   updatedAt   DateTime       @updatedAt @map("updated_at")
   resolvedAt  DateTime?      @map("resolved_at")
 
+  messages    TicketMessage[]
+
   @@map("tickets")
+}
+
+enum MessageAuthorRole {
+  END_USER
+  STAFF
+}
+
+model TicketMessage {
+  id         String            @id @default(uuid()) @db.Uuid
+  ticketId   String            @map("ticket_id") @db.Uuid
+  ticket     Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId   String            @map("author_id")
+  authorRole MessageAuthorRole @map("author_role")
+  content    String
+
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("ticket_messages")
 }

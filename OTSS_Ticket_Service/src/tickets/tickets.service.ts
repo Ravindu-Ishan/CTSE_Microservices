@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Prisma, TicketStatus } from '@prisma/client';
+import { CreateMessageDto } from './dto/create-message.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { KAFKA_TOPICS } from '../kafka/kafka.topics';
@@ -126,5 +127,36 @@ export class TicketsService {
     });
 
     return closed;
+  }
+
+  async addMessage(ticketId: string, dto: CreateMessageDto) {
+    // Verify ticket exists before posting a message
+    await this.findOne(ticketId);
+
+    const message = await this.prisma.ticketMessage.create({
+      data: {
+        ticketId,
+        authorId:   dto.authorId,
+        authorRole: dto.authorRole,
+        content:    dto.content,
+      },
+    });
+
+    this.logger.debug(
+      { ticketId, messageId: message.id, authorRole: message.authorRole },
+      'Message added to ticket',
+    );
+
+    return message;
+  }
+
+  async getMessages(ticketId: string) {
+    // Verify ticket exists
+    await this.findOne(ticketId);
+
+    return this.prisma.ticketMessage.findMany({
+      where:   { ticketId },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }
