@@ -1,11 +1,7 @@
-.claude
-CLAUDE.md
-SECRETS_REFERENCE.txt
-
 # compiled output
-*/dist
-*/node_modules
-*/build
+/dist
+/node_modules
+/build
 
 # Logs
 logs
@@ -60,10 +56,3 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
-
-terraform/.terraform/
-terraform/terraform.tfvars
-terraform/*.tfstate
-terraform/*.tfstate.backup
-
-kubernetes-is-7.2.0.1/

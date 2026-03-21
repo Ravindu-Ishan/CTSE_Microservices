@@ -1,0 +1,202 @@
+# ============================================================
+# WSO2 IS 7.2.0 — Helm Values Override (Staging / AWS EKS)
+#
+# Only contains overrides from chart defaults.
+# Everything not listed here uses the chart default values.yaml.
+#
+# Deploy:
+#   helm upgrade --install wso2-is ./kubernetes-is-7.2.0.1 \
+#     -f k8s/wso2-is/values.yaml \
+#     -n otss --create-namespace
+# ============================================================
+
+wso2:
+  subscription:
+    username: ""
+    password: ""
+
+deployment:
+
+  # Use our GHCR image — open-source build, no WSO2 account needed
+  image:
+    registry: "ghcr.io"
+    repository: "Ravindu-Ishan/wso2-is"
+    tag: "7.2.0"
+    pullPolicy: "Always"
+    imagePullSecret: ""
+
+  replicas: 1
+
+  # AppArmor not available on standard EKS node AMIs
+  apparmor:
+    enabled: false
+
+  ingress:
+    hostName: "wso2is.otss.internal"
+    ingressClassName: "alb"
+    tlsSecretsName: ""
+    azure:
+      enabled: false
+    aws:
+      enabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+        nginx.ingress.kubernetes.io/affinity: "cookie"
+        nginx.ingress.kubernetes.io/session-cookie-name: "paf"
+        nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+        nginx.ingress.kubernetes.io/session-cookie-samesite: "None"
+        nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
+        nginx.ingress.kubernetes.io/session-cookie-path: "/"
+        nginx.ingress.kubernetes.io/proxy-buffering: "on"
+        nginx.ingress.kubernetes.io/proxy-buffer-size: "64k"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+
+  # Tuned for t3.medium (2 vCPU / 4GB RAM)
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "500m"
+    limits:
+      memory: "3Gi"
+      cpu: "1500m"
+    jvm:
+      memOpts: "-Xms1024m -Xmx2048m"
+      javaOpts: >-
+        -Djdk.tls.ephemeralDHKeySize=2048
+        -Djdk.tls.rejectClientInitiatedRenegotiation=true
+        -Dhttpclient.hostnameVerifier=Strict
+        -Djdk.tls.client.protocols=TLSv1.2
+        -Djava.util.prefs.systemRoot=/home/wso2carbon/.java
+        -Djava.util.prefs.userRoot=/home/wso2carbon/.java/.userPrefs
+
+  # WSO2 IS takes 2-3 min to start on t3.medium — widen the startup window
+  startupProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 30
+
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 15
+
+  livenessProbe:
+    periodSeconds: 15
+
+  persistence:
+    enabled: false
+
+  secretStore:
+    enabled: false
+    aws:
+      enabled: false
+    azure:
+      enabled: false
+
+  externalJKS:
+    enabled: false
+
+  hpa:
+    enabled: false
+
+  securityContext:
+    runAsUser: 802
+    enableRunAsUser: true
+    runAsGroup: 802
+    enableRunAsGroup: true
+    seccompProfile:
+      enabled: false
+    seLinux:
+      enabled: false
+
+  rbac:
+    aws:
+      annotations:
+        eks.amazonaws.com/role-arn: "null"
+
+deploymentToml:
+
+  superAdmin:
+    username: "admin"
+    password: "<WSO2_ADMIN_PASSWORD>"
+    createAdminAccount: true
+
+  # Single node — disable Hazelcast clustering
+  clustering:
+    enabled: false
+
+  database:
+    identity:
+      type: "postgresql"
+      url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_iam?currentSchema=wso2_identity"
+      username: "otssadmin"
+      password: "<DB_PASSWORD>"
+      driver: "org.postgresql.Driver"
+      poolOptions:
+        maxActive: "50"
+        maxWait: "60000"
+        minIdle: "5"
+        testOnBorrow: true
+        validationQuery: "SELECT 1"
+
+    shared:
+      type: "postgresql"
+      url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_iam?currentSchema=wso2_shared"
+      username: "otssadmin"
+      password: "<DB_PASSWORD>"
+      driver: "org.postgresql.Driver"
+      poolOptions:
+        maxActive: "50"
+        maxWait: "60000"
+        minIdle: "5"
+        testOnBorrow: true
+        validationQuery: "SELECT 1"
+
+    user:
+      type: "postgresql"
+      url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_iam?currentSchema=wso2_shared"
+      username: "otssadmin"
+      password: "<DB_PASSWORD>"
+      driver: "org.postgresql.Driver"
+
+    consent:
+      type: "postgresql"
+      url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_iam?currentSchema=wso2_consent"
+      username: "otssadmin"
+      password: "<DB_PASSWORD>"
+      driver: "org.postgresql.Driver"
+      poolOptions:
+        maxActive: "50"
+        maxWait: "60000"
+        minIdle: "5"
+        testOnBorrow: true
+        validationQuery: "SELECT 1"
+
+    agentIdentity:
+      type: "postgresql"
+      url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_iam?currentSchema=wso2_identity"
+      username: "otssadmin"
+      password: "<DB_PASSWORD>"
+      driver: "org.postgresql.Driver"
+
+  recaptcha:
+    enabled: false
+  outputAdapter:
+    email:
+      enabled: false
+  otp:
+    email:
+      enabled: false
+    sms:
+      enabled: false
+  totp:
+    enabled: false
+  oauth:
+    tokenCleanup: false
+    tokenGeneration:
+      includeUsernameInAccessToken: false
+  userAccountLock:
+    enabled: true
+    loginAttempts:
+      allowedFailedAttempts: 5
+      autoUnlockTimeIncrementRatio: 2
+      autoUnlockAfter: 5
