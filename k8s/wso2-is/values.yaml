@@ -54,13 +54,13 @@ deployment:
   # Tuned for t3.medium (2 vCPU / 4GB RAM)
   resources:
     requests:
-      memory: "2Gi"
+      memory: "1Gi"
       cpu: "500m"
     limits:
-      memory: "3Gi"
+      memory: "2Gi"
       cpu: "1500m"
     jvm:
-      memOpts: "-Xms1024m -Xmx2048m"
+      memOpts: "-Xms768m -Xmx1536m"
       javaOpts: >-
         -Djdk.tls.ephemeralDHKeySize=2048
         -Djdk.tls.rejectClientInitiatedRenegotiation=true
@@ -133,9 +133,9 @@ deploymentToml:
       password: "<DB_PASSWORD>"
       driver: "org.postgresql.Driver"
       poolOptions:
-        maxActive: "50"
+        maxActive: "10"
         maxWait: "60000"
-        minIdle: "5"
+        minIdle: "2"
         testOnBorrow: true
         validationQuery: "SELECT 1"
 
@@ -146,9 +146,9 @@ deploymentToml:
       password: "<DB_PASSWORD>"
       driver: "org.postgresql.Driver"
       poolOptions:
-        maxActive: "50"
+        maxActive: "10"
         maxWait: "60000"
-        minIdle: "5"
+        minIdle: "2"
         testOnBorrow: true
         validationQuery: "SELECT 1"
 
@@ -166,9 +166,9 @@ deploymentToml:
       password: "<DB_PASSWORD>"
       driver: "org.postgresql.Driver"
       poolOptions:
-        maxActive: "50"
+        maxActive: "10"
         maxWait: "60000"
-        minIdle: "5"
+        minIdle: "2"
         testOnBorrow: true
         validationQuery: "SELECT 1"
 

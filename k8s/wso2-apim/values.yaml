@@ -75,9 +75,9 @@ wso2:
             testOnBorrow: true
             testWhileIdle: true
             validationInterval: 30000
-            maxActive: 100
+            maxActive: 10
             maxWait: 60000
-            minIdle: 5
+            minIdle: 2
         shared_db:
           url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_apim?currentSchema=wso2_shared"
           username: "otssadmin"
@@ -87,9 +87,9 @@ wso2:
             testOnBorrow: true
             testWhileIdle: true
             validationInterval: 30000
-            maxActive: 100
+            maxActive: 10
             maxWait: 60000
-            minIdle: 5
+            minIdle: 2
 
       # Configure WSO2 IS as the external Key Manager
       iskm:
@@ -170,8 +170,8 @@ wso2:
         cpu: "1500m"
       jvm:
         memory:
-          xms: "1024m"
-          xmx: "1536m"
+          xms: "768m"
+          xmx: "1280m"
 
     # WSO2 APIM takes 3-5 min to start — widen startup window
     startupProbe:
