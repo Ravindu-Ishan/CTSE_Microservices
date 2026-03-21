@@ -134,7 +134,7 @@ jobs:
         # wso2 taint still needs to be patched since the chart
         # does not expose tolerations as a value.
         run: |
-          kubectl patch deployment ${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one \
+          kubectl patch deployment ${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one-am-deployment-1 \
             -n ${{ env.HELM_NAMESPACE }} \
             --type=json \
             -p='[
@@ -147,7 +147,7 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one \
+          kubectl rollout status deployment/${{ env.HELM_RELEASE_NAME }}-wso2am-all-in-one-am-deployment-1 \
             -n ${{ env.HELM_NAMESPACE }} \
             --timeout=900s
 
