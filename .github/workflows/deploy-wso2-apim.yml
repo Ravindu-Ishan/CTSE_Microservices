@@ -129,11 +129,14 @@ jobs:
           docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/wso2carbon.jks ./wso2carbon.jks
           docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/client-truststore.jks ./client-truststore.jks
           docker rm apim-tmp
+          # Delete existing secret if present then recreate
+          # Cannot use apply on binary secrets due to annotation size limit
+          kubectl delete secret wso2-apim-keystore-secret \
+            -n ${{ env.HELM_NAMESPACE }} --ignore-not-found
           kubectl create secret generic wso2-apim-keystore-secret \
             --from-file=wso2carbon.jks=./wso2carbon.jks \
             --from-file=client-truststore.jks=./client-truststore.jks \
-            -n ${{ env.HELM_NAMESPACE }} \
-            --dry-run=client -o yaml | kubectl apply -f -
+            -n ${{ env.HELM_NAMESPACE }}
 
       - name: Add WSO2 Helm repository
         run: |
