@@ -42,7 +42,7 @@ env:
   IMAGE_TAG: "7.2.0"
   HELM_RELEASE_NAME: wso2-is
   HELM_NAMESPACE: otss
-  HELM_CHART_PATH: ./kubernetes-is-7.2.0.1
+  HELM_CHART_VERSION: "7.2.0-1"
   VALUES_FILE: ./k8s/wso2-is/values.yaml
 
 jobs:
@@ -120,10 +120,16 @@ jobs:
           sed -i "s|<DB_PASSWORD>|${{ secrets.DB_PASSWORD }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<WSO2_ADMIN_PASSWORD>|${{ secrets.WSO2_ADMIN_PASSWORD }}|g" ${{ env.VALUES_FILE }}
 
+      - name: Add WSO2 Helm repository
+        run: |
+          helm repo add wso2 https://helm.wso2.com
+          helm repo update
+
       - name: Helm upgrade --install
         run: |
           helm upgrade --install ${{ env.HELM_RELEASE_NAME }} \
-            ${{ env.HELM_CHART_PATH }} \
+            wso2/identity-server \
+            --version ${{ env.HELM_CHART_VERSION }} \
             --namespace ${{ env.HELM_NAMESPACE }} \
             --values ${{ env.VALUES_FILE }} \
             --timeout 10m \
