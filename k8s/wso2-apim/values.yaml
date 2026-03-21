@@ -127,8 +127,10 @@ wso2:
     image:
       registry: "ghcr.io"
       repository: "ravindu-ishan/wso2-apim"
-      # tag is used — do NOT add digest key at all (even empty string
-      # is truthy in Go templates and will break the image reference)
+      # Must explicitly set digest to null to prevent chart default
+      # empty string "" from being used — empty string is truthy in
+      # Go templates and produces invalid image ref: registry/repo@
+      digest: ~
       tag: "4.6.0"
       imagePullPolicy: Always
       imagePullSecrets:
