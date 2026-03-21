@@ -16,7 +16,14 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
     const brokers  = configService.getOrThrow<string>('KAFKA_BROKERS').split(',');
     const clientId = configService.get<string>('KAFKA_CLIENT_ID') ?? 'queue-service';
 
-    const kafka = new Kafka({ clientId, brokers });
+    const kafka = new Kafka({
+      clientId,
+      brokers,
+      retry: {
+        initialRetryTime: 300,
+        retries: 10,
+      },
+    });
     this.consumer = kafka.consumer({ groupId: KAFKA_CONSUMER_GROUP });
   }
 
