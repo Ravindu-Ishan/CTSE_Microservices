@@ -108,6 +108,7 @@ resource "aws_eks_node_group" "wso2" {
 
 # ----------------------------------------------------------------
 # Node group — NestJS services (t3.small)
+# 2 nodes required to run all 4 microservices within memory limits
 # ----------------------------------------------------------------
 resource "aws_eks_node_group" "services" {
   cluster_name    = aws_eks_cluster.main.name
@@ -117,7 +118,7 @@ resource "aws_eks_node_group" "services" {
   instance_types  = [var.services_instance_type]
 
   scaling_config {
-    desired_size = 1
+    desired_size = 2
     min_size     = 0
     max_size     = 2
   }

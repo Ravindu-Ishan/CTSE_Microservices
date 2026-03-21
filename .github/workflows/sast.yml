@@ -1,0 +1,50 @@
+# ============================================================
+# SAST — SonarQube Cloud Analysis
+#
+# Triggers:
+#   - Push to staging branch
+#   - Pull request targeting master
+#
+# This acts as a quality gate — code must pass SonarCloud
+# analysis before being merged into master.
+#
+# Required GitHub Secrets:
+#   SONAR_TOKEN — from sonarcloud.io/account/security
+# ============================================================
+
+name: SAST — SonarQube Cloud
+
+on:
+  push:
+    branches:
+      - staging
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  sonarcloud:
+    name: SonarQube Cloud Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history required for accurate blame information
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: SonarQube Cloud Scan
+        uses: sonarsource/sonarqube-scan-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

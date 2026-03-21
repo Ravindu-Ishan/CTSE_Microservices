@@ -67,3 +67,5 @@ terraform/*.tfstate
 terraform/*.tfstate.backup
 
 kubernetes-is-7.2.0.1/
+helm-apim-all-in-one-4.6.0-2/
+WSO2_IAM_Docker_7.2/dbscripts/
