@@ -91,12 +91,6 @@ wso2:
             maxWait: 60000
             minIdle: 5
 
-      # Configure WSO2 IS as the external Key Manager
-      iskm:
-        enabled: true
-        serviceName: "wso2-is-identity-server.otss.svc.cluster.local"
-        revokeURL: "https://wso2-is-identity-server.otss.svc.cluster.local:9443/oauth2/revoke"
-
       gateway:
         environments:
         - name: "Default"

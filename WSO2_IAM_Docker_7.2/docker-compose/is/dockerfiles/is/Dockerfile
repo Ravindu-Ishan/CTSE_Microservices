@@ -122,6 +122,11 @@ ADD --chown=wso2carbon:wso2 https://repo1.maven.org/maven2/dnsjava/dnsjava/${DNS
 # Add PostgreSQL JDBC connector to enable PostgreSQL databases.
 ADD --chown=wso2carbon:wso2 https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.10/postgresql-42.7.10.jar ${WSO2_SERVER_HOME}/repository/components/lib/
 
+# Required for IS-as-KM: notifies APIM of token revocation events
+ADD --chown=wso2carbon:wso2 \
+    https://maven.wso2.org/nexus/content/repositories/releases/org/wso2/km/ext/wso2is/wso2is.notification.event.handlers/2.0.5/wso2is.notification.event.handlers-2.0.5.jar \
+    ${WSO2_SERVER_HOME}/repository/components/dropins/
+
 # Set the user and work directory.
 USER ${USER_ID}
 WORKDIR ${USER_HOME}
