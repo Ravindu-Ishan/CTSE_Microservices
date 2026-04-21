@@ -37,7 +37,7 @@ variable "enable_nat_gateway" {
 variable "eks_cluster_version" {
   description = "Kubernetes version for EKS cluster"
   type        = string
-  default     = "1.29"
+  default     = "1.31"
 }
 
 variable "wso2_instance_type" {

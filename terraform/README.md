@@ -1,38 +1,67 @@
-# Steps to take down resources and keep only datbaase running
+# Cost-saving teardown — keep RDS running, destroy everything else
 
-## Step 1 — Apply first (breaks the EKS→RDS dependency in AWS)
-```
-terraform apply
-```
-This removes the EKS SG ingress rule from the RDS SG in AWS, sets publicly_accessible = true, and ensures RDS is fully standalone. Check the plan output before typing yes — you should see RDS SG being updated in-place, NOT destroyed.
+> **Rule:** Never run `terraform destroy` without `-target`. It will delete RDS and all data.
+> The VPC must stay up — it hosts the Internet Gateway that makes RDS reachable from pgAdmin4.
 
-## Step 2 — Destroy EKS only
-```
-terraform destroy -target="module.eks"
-```
-Before typing yes, verify the plan output contains only module.eks.* resources. If you see module.rds or module.ssm in the list, do not proceed and paste the plan here.
+---
 
-## Step 3 — Remove NAT Gateway
-Add this to terraform.tfvars:
+## Tear down (save costs, keep RDS accessible)
 
+### Step 1 — Destroy EKS (control plane + all node groups)
+```
+terraform destroy -target=module.eks
+```
+Before confirming, verify the plan shows only `module.eks.*` resources. If you see `module.rds` or `module.vpc` in the list, do not proceed.
+
+### Step 2 — Disable NAT Gateway (~$32/month saving)
+In `terraform.tfvars`, set:
 ```
 enable_nat_gateway = false
 ```
 Then:
 ```
-terraform apply
+terraform apply -target=module.vpc
 ```
-### Step 4 — Verify RDS is still up and accessible
 
-Confirm RDS is still in Terraform state
+### Step 3 — Verify RDS is still reachable
 ```
 terraform state list | grep rds
+terraform output rds_endpoint
 ```
-## Get the endpoint
+Connect from pgAdmin4 using the same endpoint as before — it should still be accessible.
+
+---
+
+## Bring everything back up
+
+### Step 1 — Re-enable NAT Gateway
+In `terraform.tfvars`, set:
 ```
-terraform output
+enable_nat_gateway = true
 ```
-## or
+Then:
 ```
-terraform state show module.rds.aws_db_instance.main | grep -E "endpoint|publicly|status"
+terraform apply -target=module.vpc
 ```
+
+### Step 2 — Apply everything
+```
+terraform apply
+```
+This recreates EKS, node groups, access entries, and all remaining resources.
+
+---
+
+## What stays running (and costs money) during teardown
+| Resource | Cost | Why kept |
+|---|---|---|
+| VPC, subnets, IGW, route tables | Free | Required for RDS external access |
+| RDS db.t3.micro | Free tier / ~$15/mo | Preserves databases and schemas |
+| SSM parameters | ~$0 | Preserves secrets |
+
+## What gets destroyed
+| Resource | Monthly saving |
+|---|---|
+| EKS control plane | ~$72 |
+| EC2 nodes (3 node groups) | ~$30–60 |
+| NAT Gateway | ~$32 |
