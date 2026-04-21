@@ -1,0 +1,71 @@
+name: Extract WSO2 Public Certificates
+
+# One-time utility workflow — run manually to extract and commit
+# the public certificates from WSO2 IS and APIM Docker images.
+# These certs are imported into each product's truststore at deploy
+# time so APIM and IS can communicate over HTTPS (IS-as-KM setup).
+#
+# Safe to commit: .pem files contain only the public certificate,
+# no private keys.
+#
+# Re-run if either Docker image is rebuilt with a new keystore.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  extract-and-commit:
+    name: Extract Certs and Commit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract IS public certificate
+        run: |
+          docker pull ghcr.io/ravindu-ishan/wso2-is:7.2.0
+          docker create --name is-tmp ghcr.io/ravindu-ishan/wso2-is:7.2.0
+          docker cp is-tmp:/home/wso2carbon/wso2is-7.2.0/repository/resources/security/wso2carbon.jks ./is-wso2carbon.jks
+          docker rm is-tmp
+          mkdir -p certs
+          keytool -export -alias wso2carbon \
+            -keystore ./is-wso2carbon.jks \
+            -storepass wso2carbon \
+            -rfc \
+            -file ./certs/wso2-is.pem
+          echo "IS certificate extracted:"
+          keytool -printcert -file ./certs/wso2-is.pem | grep -E "Owner|SHA256|Valid"
+
+      - name: Extract APIM public certificate
+        run: |
+          docker pull ghcr.io/ravindu-ishan/wso2-apim:4.6.0
+          docker create --name apim-tmp ghcr.io/ravindu-ishan/wso2-apim:4.6.0
+          docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/wso2carbon.jks ./apim-wso2carbon.jks
+          docker rm apim-tmp
+          keytool -export -alias wso2carbon \
+            -keystore ./apim-wso2carbon.jks \
+            -storepass wso2carbon \
+            -rfc \
+            -file ./certs/wso2-apim.pem
+          echo "APIM certificate extracted:"
+          keytool -printcert -file ./certs/wso2-apim.pem | grep -E "Owner|SHA256|Valid"
+
+      - name: Commit certificates to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add certs/wso2-is.pem certs/wso2-apim.pem
+          git diff --staged --quiet && echo "No changes to commit" || \
+            git commit -m "chore: extract WSO2 IS and APIM public certificates for truststore import"
+          git push
