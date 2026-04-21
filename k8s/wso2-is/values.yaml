@@ -201,3 +201,26 @@ deploymentToml:
       allowedFailedAttempts: 5
       autoUnlockTimeIncrementRatio: 2
       autoUnlockAfter: 5
+
+  extraConfigs: |
+    [oauth]
+    authorize_all_scopes = true
+
+    [[resource.access_control]]
+    context="(.*)/scim2/Me"
+    secure=true
+    http_method="GET"
+    cross_tenant=true
+    permissions=[]
+    scopes=[]
+
+    [[event_listener]]
+    id = "token_revocation"
+    type = "org.wso2.carbon.identity.core.handler.AbstractIdentityHandler"
+    name = "org.wso2.is.notification.ApimOauthEventInterceptor"
+    order = 1
+    [event_listener.properties]
+    notification_endpoint = "https://wso2-apim-wso2am-all-in-one-am-service-1.otss.svc.cluster.local:9443/internal/data/v1/notify"
+    username = "${admin.username}"
+    password = "${admin.password}"
+    'header.X-WSO2-KEY-MANAGER' = "WSO2-IS"
