@@ -183,6 +183,25 @@ jobs:
             -n ${{ env.HELM_NAMESPACE }} \
             --timeout=900s
 
+      - name: Apply gateway NLB service
+        run: kubectl apply -f k8s/wso2-apim/gateway-nlb.yaml
+
+      - name: Print gateway NLB hostname
+        run: |
+          echo "Waiting for NLB hostname to be assigned..."
+          for i in $(seq 1 20); do
+            HOSTNAME=$(kubectl get svc wso2-apim-gateway-nlb -n ${{ env.HELM_NAMESPACE }} \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+            if [ -n "$HOSTNAME" ]; then
+              echo "Gateway NLB hostname: $HOSTNAME"
+              echo "HTTP  gateway: http://$HOSTNAME:8280"
+              echo "HTTPS gateway: https://$HOSTNAME:8243"
+              break
+            fi
+            echo "Attempt $i: not ready yet, waiting 15s..."
+            sleep 15
+          done
+
       - name: Verify deployment
         run: |
           kubectl get pods -n ${{ env.HELM_NAMESPACE }} \
