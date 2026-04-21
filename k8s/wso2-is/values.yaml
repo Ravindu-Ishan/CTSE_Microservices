@@ -194,7 +194,8 @@ deploymentToml:
   oauth:
     tokenCleanup: false
     tokenGeneration:
-      includeUsernameInAccessToken: false
+      includeUsernameInAccessToken: true
+    authorizeAllScopes: true
   userAccountLock:
     enabled: true
     loginAttempts:
@@ -203,9 +204,6 @@ deploymentToml:
       autoUnlockAfter: 5
 
   extraConfigs: |
-    [oauth]
-    authorize_all_scopes = true
-
     [[resource.access_control]]
     context="(.*)/scim2/Me"
     secure=true
