@@ -116,6 +116,31 @@ jobs:
       - name: Create namespace
         run: kubectl apply -f k8s/namespace.yaml
 
+      - name: Extract IS keystores and create K8s secret with APIM cert imported
+        run: |
+          # Extract IS keystores from image — IS 7.x uses PKCS12 (.p12)
+          docker pull ghcr.io/ravindu-ishan/wso2-is:7.2.0
+          docker create --name is-tmp ghcr.io/ravindu-ishan/wso2-is:7.2.0
+          docker cp is-tmp:/home/wso2carbon/wso2is-7.2.0/repository/resources/security/wso2carbon.p12 ./wso2carbon.p12
+          docker cp is-tmp:/home/wso2carbon/wso2is-7.2.0/repository/resources/security/client-truststore.p12 ./client-truststore.p12
+          docker rm is-tmp
+
+          # Import APIM public certificate into IS truststore so IS can call APIM over HTTPS
+          keytool -import -alias wso2apim \
+            -keystore ./client-truststore.p12 \
+            -storetype PKCS12 \
+            -storepass wso2carbon \
+            -file ./certs/wso2-apim.pem \
+            -noprompt
+
+          # Delete existing secret if present then recreate
+          kubectl delete secret wso2-is-keystore-secret \
+            -n ${{ env.HELM_NAMESPACE }} --ignore-not-found
+          kubectl create secret generic wso2-is-keystore-secret \
+            --from-file=wso2carbon.p12=./wso2carbon.p12 \
+            --from-file=client-truststore.p12=./client-truststore.p12 \
+            -n ${{ env.HELM_NAMESPACE }}
+
       - name: Inject secrets into values file
         run: |
           sed -i "s|<RDS_ENDPOINT>|${{ secrets.RDS_ENDPOINT }}|g" ${{ env.VALUES_FILE }}
