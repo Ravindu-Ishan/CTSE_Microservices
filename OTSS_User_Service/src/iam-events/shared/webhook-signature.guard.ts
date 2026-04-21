@@ -25,10 +25,10 @@ export class WebhookSignatureGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<Request & { rawBody?: Buffer }>();
-    const signature = request.headers['x-wso2-signature'] as string | undefined;
+    const signature = request.headers['x-wso2-event-signature'] as string | undefined;
 
     if (!signature) {
-      throw new UnauthorizedException('Missing X-WSO2-Signature header');
+      throw new UnauthorizedException('Missing X-WSO2-Event-Signature header');
     }
 
     const rawBody = request.rawBody;

@@ -130,13 +130,68 @@ Login with the admin credentials stored in `APIM_ADMIN_PASSWORD` (same value as 
 
 ## Accessing Both Simultaneously
 
-IS and APIM both bind to ports 9443 and 443. You **cannot port-forward both at the same time** on the same machine without port conflicts.
+IS and APIM both require port 443 for OAuth2 redirects. Two processes cannot bind to the same port, so you have two options:
 
-To switch between them:
+### Option A — Switch between them (simplest)
 
-1. Stop all four port-forward terminals (Ctrl+C)
+1. Stop all port-forward terminals (Ctrl+C)
 2. Start the port-forwards for the other application
 
+### Option B — Run all simultaneously with Caddy (4 terminals)
+
+Caddy acts as a reverse proxy that owns port 443 and routes by hostname, so IS, APIM management, and the APIM gateway are all reachable at the same time. When using this option you do **not** need the 443 port-forward from the sections above — Caddy replaces it.
+
+**Install Caddy:**
+```bash
+winget install caddyserver.caddy
+```
+
+**Add all entries to your hosts file:**
+```
+127.0.0.1 wso2is.otss.internal
+127.0.0.1 wso2apim.otss.internal
+127.0.0.1 wso2apim-gw.otss.internal
+```
+
+Then flush DNS: `ipconfig /flushdns`
+
+**Terminal 1 — IS management on 19443:**
+```bash
+kubectl port-forward svc/wso2-is-identity-server 19443:9443 -n otss
+```
+
+**Terminal 2 — APIM management on 29443:**
+```bash
+kubectl port-forward svc/wso2-apim-wso2am-all-in-one-am-service 29443:9443 -n otss
+```
+
+**Terminal 3 — APIM gateway on 39443:**
+```bash
+kubectl port-forward svc/wso2-apim-wso2am-all-in-one-am-service 39443:8243 -n otss
+```
+
+**Terminal 4 — Caddy (run as Administrator):**
+```bash
+caddy run
+```
+
+Caddy reads the `Caddyfile` in the repo root and routes all three hostnames on port 443. Keep all four terminals open.
+
+> Caddy cannot talk to Kubernetes directly — Terminals 1, 2, and 3 must remain running.
+
+**Access links:**
+```
+APIM:
+Publisher:         https://wso2apim.otss.internal/publisher
+Developer Portal:  https://wso2apim.otss.internal/devportal
+Admin Portal:      https://wso2apim.otss.internal/admin
+Carbon Console:    https://wso2apim.otss.internal/carbon
+Gateway (Try-It):  https://wso2apim-gw.otss.internal
+
+IS:
+Management Console: https://wso2is.otss.internal/console
+Carbon Console:     https://wso2is.otss.internal/carbon
+```
 ---
 
 ## Troubleshooting

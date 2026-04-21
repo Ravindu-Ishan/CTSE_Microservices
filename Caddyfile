@@ -1,0 +1,29 @@
+wso2is.otss.internal {
+    tls internal
+    reverse_proxy https://localhost:19443 {
+        header_up Host wso2is.otss.internal
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+
+wso2apim.otss.internal {
+    tls internal
+    reverse_proxy https://localhost:29443 {
+        header_up Host wso2apim.otss.internal
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
+
+wso2apim-gw.otss.internal {
+    tls internal
+    reverse_proxy https://localhost:39443 {
+        header_up Host wso2apim-gw.otss.internal
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
