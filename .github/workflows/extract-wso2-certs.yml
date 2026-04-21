@@ -36,11 +36,13 @@ jobs:
         run: |
           docker pull ghcr.io/ravindu-ishan/wso2-is:7.2.0
           docker create --name is-tmp ghcr.io/ravindu-ishan/wso2-is:7.2.0
-          docker cp is-tmp:/home/wso2carbon/wso2is-7.2.0/repository/resources/security/wso2carbon.jks ./is-wso2carbon.jks
+          # IS 7.x uses PKCS12 (.p12) instead of JKS
+          docker cp is-tmp:/home/wso2carbon/wso2is-7.2.0/repository/resources/security/wso2carbon.p12 ./is-wso2carbon.p12
           docker rm is-tmp
           mkdir -p certs
           keytool -export -alias wso2carbon \
-            -keystore ./is-wso2carbon.jks \
+            -keystore ./is-wso2carbon.p12 \
+            -storetype PKCS12 \
             -storepass wso2carbon \
             -rfc \
             -file ./certs/wso2-is.pem
