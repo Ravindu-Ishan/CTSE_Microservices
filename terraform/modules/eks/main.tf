@@ -44,6 +44,10 @@ resource "aws_eks_cluster" "main" {
     endpoint_public_access  = true
   }
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
   depends_on = [aws_iam_role_policy_attachment.eks_cluster_policy]
 }
 
@@ -276,30 +280,31 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
 # This is recreated automatically on every terraform apply so
 # tearing down and recreating the cluster never breaks the pipeline.
 # ----------------------------------------------------------------
-resource "kubernetes_config_map_v1_data" "aws_auth" {
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
+# ----------------------------------------------------------------
+# EKS Access Entries — replaces aws-auth ConfigMap
+# Uses AWS-native API so no Kubernetes provider is needed.
+# This means terraform apply works even when the cluster is down.
+# ----------------------------------------------------------------
+resource "aws_eks_access_entry" "nodes" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.eks_node.arn
+  type          = "EC2_LINUX"
+}
+
+resource "aws_eks_access_entry" "github_actions" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.github_actions.arn
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "github_actions_admin" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = aws_iam_role.github_actions.arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
   }
-
-  force = true
-
-  data = {
-    mapRoles = yamlencode([
-      {
-        rolearn  = aws_iam_role.eks_node.arn
-        username = "system:node:{{EC2PrivateDNSName}}"
-        groups   = ["system:bootstrappers", "system:nodes"]
-      },
-      {
-        rolearn  = aws_iam_role.github_actions.arn
-        username = "github-actions"
-        groups   = ["system:masters"]
-      }
-    ])
-  }
-
-  depends_on = [aws_eks_cluster.main]
 }
 
 # ----------------------------------------------------------------
