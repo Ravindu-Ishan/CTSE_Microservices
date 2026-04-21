@@ -75,7 +75,7 @@ wso2:
             testOnBorrow: true
             testWhileIdle: true
             validationInterval: 30000
-            maxActive: 25
+            maxActive: 35
             maxWait: 60000
             minIdle: 3
         shared_db:
@@ -87,7 +87,7 @@ wso2:
             testOnBorrow: true
             testWhileIdle: true
             validationInterval: 30000
-            maxActive: 25
+            maxActive: 35
             maxWait: 60000
             minIdle: 3
 
