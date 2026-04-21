@@ -75,6 +75,9 @@ jobs:
             --region ${{ vars.AWS_REGION }} \
             --name ${{ vars.EKS_CLUSTER_NAME }}
 
+      - name: Create namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
       - name: Create K8s secret
         run: |
           kubectl create secret generic ticket-service-secrets \

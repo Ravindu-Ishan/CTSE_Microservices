@@ -122,6 +122,9 @@ jobs:
           sed -i "s|<APIM_ADMIN_PASSWORD>|${{ secrets.APIM_ADMIN_PASSWORD }}|g" ${{ env.VALUES_FILE }}
           sed -i "s|<IMAGE_DIGEST>|${{ needs.build-and-push.outputs.image-digest }}|g" ${{ env.VALUES_FILE }}
 
+      - name: Create namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
       - name: Extract default keystores from APIM image and create K8s secret
         run: |
           docker pull ghcr.io/ravindu-ishan/wso2-apim@${{ needs.build-and-push.outputs.image-digest }}

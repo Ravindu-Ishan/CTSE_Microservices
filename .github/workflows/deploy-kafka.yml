@@ -37,6 +37,9 @@ jobs:
             --region ${{ vars.AWS_REGION }} \
             --name ${{ vars.EKS_CLUSTER_NAME }}
 
+      - name: Create namespace
+        run: kubectl apply -f k8s/namespace.yaml
+
       - name: Deploy Kafka
         run: kubectl apply -f k8s/kafka/kafka.yaml
 
