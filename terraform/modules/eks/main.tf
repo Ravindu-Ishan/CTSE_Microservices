@@ -285,6 +285,24 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
 # Uses AWS-native API so no Kubernetes provider is needed.
 # This means terraform apply works even when the cluster is down.
 # ----------------------------------------------------------------
+resource "aws_eks_access_entry" "developers" {
+  for_each      = toset(var.developer_iam_arns)
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value
+  type          = "STANDARD"
+}
+
+resource "aws_eks_access_policy_association" "developers_admin" {
+  for_each      = toset(var.developer_iam_arns)
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = each.value
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+}
+
 resource "aws_eks_access_entry" "nodes" {
   cluster_name  = aws_eks_cluster.main.name
   principal_arn = aws_iam_role.eks_node.arn

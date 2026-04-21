@@ -40,6 +40,12 @@ variable "eks_cluster_version" {
   default     = "1.31"
 }
 
+variable "developer_iam_arns" {
+  description = "List of IAM user/role ARNs granted cluster-admin kubectl access"
+  type        = list(string)
+  default     = []
+}
+
 variable "wso2_instance_type" {
   description = "EC2 instance type for WSO2 IS + APIM node group"
   type        = string

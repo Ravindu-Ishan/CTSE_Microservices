@@ -32,6 +32,7 @@ module "eks" {
   private_subnet_ids     = module.vpc.private_subnet_ids
   wso2_instance_type     = var.wso2_instance_type
   services_instance_type = var.services_instance_type
+  developer_iam_arns     = var.developer_iam_arns
 }
 
 # ----------------------------------------------------------------
