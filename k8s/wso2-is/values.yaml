@@ -94,7 +94,8 @@ deployment:
       enabled: false
 
   externalJKS:
-    enabled: false
+    enabled: true
+    secretName: "wso2-is-keystore-secret"
 
   hpa:
     enabled: false

@@ -127,11 +127,20 @@ jobs:
 
       - name: Extract default keystores from APIM image and create K8s secret
         run: |
+          # Extract APIM keystores from image
           docker pull ghcr.io/ravindu-ishan/wso2-apim@${{ needs.build-and-push.outputs.image-digest }}
           docker create --name apim-tmp ghcr.io/ravindu-ishan/wso2-apim@${{ needs.build-and-push.outputs.image-digest }}
           docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/wso2carbon.jks ./wso2carbon.jks
           docker cp apim-tmp:/home/wso2carbon/wso2am-4.6.0/repository/resources/security/client-truststore.jks ./client-truststore.jks
           docker rm apim-tmp
+
+          # Import IS public certificate into APIM truststore so APIM can call IS over HTTPS
+          keytool -import -alias wso2is \
+            -keystore ./client-truststore.jks \
+            -storepass wso2carbon \
+            -file ./certs/wso2-is.pem \
+            -noprompt
+
           # Delete existing secret if present then recreate
           # Cannot use apply on binary secrets due to annotation size limit
           kubectl delete secret wso2-apim-keystore-secret \

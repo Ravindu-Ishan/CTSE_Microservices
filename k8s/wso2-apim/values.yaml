@@ -75,9 +75,9 @@ wso2:
             testOnBorrow: true
             testWhileIdle: true
             validationInterval: 30000
-            maxActive: 50
+            maxActive: 25
             maxWait: 60000
-            minIdle: 5
+            minIdle: 3
         shared_db:
           url: "jdbc:postgresql://<RDS_ENDPOINT>:5432/otss_wso2_apim?currentSchema=wso2_shared"
           username: "otssadmin"
@@ -87,9 +87,9 @@ wso2:
             testOnBorrow: true
             testWhileIdle: true
             validationInterval: 30000
-            maxActive: 50
+            maxActive: 25
             maxWait: 60000
-            minIdle: 5
+            minIdle: 3
 
       gateway:
         environments:
