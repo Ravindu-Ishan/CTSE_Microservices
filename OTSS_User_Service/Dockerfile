@@ -33,7 +33,7 @@ FROM node:24-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl ca-certificates
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
