@@ -1,0 +1,616 @@
+openapi: 3.0.3
+info:
+  title: OTSS Ticket Service
+  description: Manages support ticket lifecycle and publishes ticket events to Kafka.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3030
+    description: Local development
+  - url: https://api.otss.example.com
+    description: Production (AWS)
+
+tags:
+  - name: Health
+    description: Service health check
+  - name: Tickets
+    description: Support ticket lifecycle management
+  - name: Messages
+    description: Ticket conversation threads
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+              example:
+                status: ok
+
+  /tickets:
+    post:
+      tags: [Tickets]
+      summary: Create a new support ticket
+      operationId: createTicket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketDto'
+            example:
+              title: Cannot access VPN
+              description: I have been unable to connect to the company VPN since yesterday morning. I get a timeout error every time I try.
+              category: IT
+              priority: HIGH
+              createdBy: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      responses:
+        '201':
+          description: Ticket created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              example:
+                id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                title: Cannot access VPN
+                description: I have been unable to connect to the company VPN since yesterday morning. I get a timeout error every time I try.
+                category: IT
+                status: OPEN
+                priority: HIGH
+                createdBy: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                assignedTo: null
+                createdAt: '2026-04-22T08:00:00.000Z'
+                updatedAt: '2026-04-22T08:00:00.000Z'
+                resolvedAt: null
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags: [Tickets]
+      summary: List tickets with optional filters
+      operationId: listTickets
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TicketStatus'
+          example: OPEN
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TicketCategory'
+          example: IT
+        - name: priority
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TicketPriority'
+          example: HIGH
+        - name: createdBy
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        - name: assignedTo
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+      responses:
+        '200':
+          description: Paginated list of tickets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+              example:
+                - id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                  title: Cannot access VPN
+                  description: I have been unable to connect to the company VPN since yesterday morning.
+                  category: IT
+                  status: OPEN
+                  priority: HIGH
+                  createdBy: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                  assignedTo: null
+                  createdAt: '2026-04-22T08:00:00.000Z'
+                  updatedAt: '2026-04-22T08:00:00.000Z'
+                  resolvedAt: null
+                - id: c3d4e5f6-a7b8-9012-cdef-123456789012
+                  title: Billing invoice discrepancy
+                  description: My invoice for March shows an incorrect charge.
+                  category: BILLING
+                  status: IN_PROGRESS
+                  priority: MEDIUM
+                  createdBy: d4e5f6a7-b8c9-0123-defa-234567890123
+                  assignedTo: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                  createdAt: '2026-04-21T14:30:00.000Z'
+                  updatedAt: '2026-04-22T09:15:00.000Z'
+                  resolvedAt: null
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Get a ticket by ID
+      operationId: getTicketById
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      responses:
+        '200':
+          description: Ticket found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              example:
+                id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                title: Cannot access VPN
+                description: I have been unable to connect to the company VPN since yesterday morning. I get a timeout error every time I try.
+                category: IT
+                status: OPEN
+                priority: HIGH
+                createdBy: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                assignedTo: null
+                createdAt: '2026-04-22T08:00:00.000Z'
+                updatedAt: '2026-04-22T08:00:00.000Z'
+                resolvedAt: null
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      tags: [Tickets]
+      summary: Update a ticket
+      operationId: updateTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTicketDto'
+            example:
+              status: IN_PROGRESS
+              assignedTo: b2c3d4e5-f6a7-8901-bcde-f12345678901
+              priority: URGENT
+      responses:
+        '200':
+          description: Ticket updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              example:
+                id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                title: Cannot access VPN
+                description: I have been unable to connect to the company VPN since yesterday morning. I get a timeout error every time I try.
+                category: IT
+                status: IN_PROGRESS
+                priority: URGENT
+                createdBy: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                assignedTo: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                createdAt: '2026-04-22T08:00:00.000Z'
+                updatedAt: '2026-04-22T10:00:00.000Z'
+                resolvedAt: null
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tickets/{id}/close:
+    patch:
+      tags: [Tickets]
+      summary: Close a ticket
+      operationId: closeTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      responses:
+        '200':
+          description: Ticket closed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              example:
+                id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                title: Cannot access VPN
+                description: I have been unable to connect to the company VPN since yesterday morning. I get a timeout error every time I try.
+                category: IT
+                status: CLOSED
+                priority: HIGH
+                createdBy: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                assignedTo: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                createdAt: '2026-04-22T08:00:00.000Z'
+                updatedAt: '2026-04-22T11:30:00.000Z'
+                resolvedAt: '2026-04-22T11:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tickets/{id}/messages:
+    post:
+      tags: [Messages]
+      summary: Post a message on a ticket
+      operationId: createMessage
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageDto'
+            example:
+              content: I have tried restarting my machine and reinstalling the VPN client but the issue persists. Error code is TLS_HANDSHAKE_FAILED.
+              authorId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+              authorRole: END_USER
+      responses:
+        '201':
+          description: Message posted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketMessage'
+              example:
+                id: e5f6a7b8-c9d0-1234-efab-345678901234
+                ticketId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                authorId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                authorRole: END_USER
+                content: I have tried restarting my machine and reinstalling the VPN client but the issue persists. Error code is TLS_HANDSHAKE_FAILED.
+                createdAt: '2026-04-22T09:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags: [Messages]
+      summary: Get the full conversation thread for a ticket
+      operationId: getMessages
+      parameters:
+        - $ref: '#/components/parameters/TicketId'
+      responses:
+        '200':
+          description: List of messages for the ticket
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TicketMessage'
+              example:
+                - id: e5f6a7b8-c9d0-1234-efab-345678901234
+                  ticketId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                  authorId: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                  authorRole: END_USER
+                  content: I have tried restarting my machine and reinstalling the VPN client but the issue persists. Error code is TLS_HANDSHAKE_FAILED.
+                  createdAt: '2026-04-22T09:00:00.000Z'
+                - id: f6a7b8c9-d0e1-2345-fabc-456789012345
+                  ticketId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+                  authorId: b2c3d4e5-f6a7-8901-bcde-f12345678901
+                  authorRole: STAFF
+                  content: Thank you for the details. I have escalated this to the network team. Please allow up to 2 hours for resolution.
+                  createdAt: '2026-04-22T09:45:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    TicketId:
+      name: id
+      in: path
+      required: true
+      description: Ticket UUID
+      schema:
+        type: string
+        format: uuid
+      example: f47ac10b-58cc-4372-a567-0e02b2c3d479
+
+  schemas:
+    TicketStatus:
+      type: string
+      enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED]
+      description: Current lifecycle state of the ticket
+
+    TicketPriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, URGENT]
+      description: Urgency level of the ticket
+
+    TicketCategory:
+      type: string
+      enum: [IT, BILLING, ACCESS, OTHER]
+      description: Department or domain the ticket belongs to
+
+    MessageAuthorRole:
+      type: string
+      enum: [END_USER, STAFF]
+      description: Role of the message author
+
+    Ticket:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - category
+        - status
+        - priority
+        - createdBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique ticket identifier
+          example: f47ac10b-58cc-4372-a567-0e02b2c3d479
+        title:
+          type: string
+          maxLength: 200
+          description: Short summary of the issue
+          example: Cannot access VPN
+        description:
+          type: string
+          maxLength: 2000
+          description: Full description of the issue
+          example: I have been unable to connect to the company VPN since yesterday morning.
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        createdBy:
+          type: string
+          format: uuid
+          description: UUID of the user who opened the ticket
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        assignedTo:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the staff member assigned to this ticket
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of ticket creation
+          example: '2026-04-22T08:00:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the last update
+          example: '2026-04-22T10:00:00.000Z'
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp of when the ticket was closed/resolved
+          example: '2026-04-22T11:30:00.000Z'
+
+    TicketMessage:
+      type: object
+      required:
+        - id
+        - ticketId
+        - authorId
+        - authorRole
+        - content
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique message identifier
+          example: e5f6a7b8-c9d0-1234-efab-345678901234
+        ticketId:
+          type: string
+          format: uuid
+          description: UUID of the parent ticket
+          example: f47ac10b-58cc-4372-a567-0e02b2c3d479
+        authorId:
+          type: string
+          format: uuid
+          description: UUID of the message author
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        authorRole:
+          $ref: '#/components/schemas/MessageAuthorRole'
+        content:
+          type: string
+          maxLength: 5000
+          description: Body of the message
+          example: I have tried restarting my machine but the issue persists.
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of message creation
+          example: '2026-04-22T09:00:00.000Z'
+
+    CreateTicketDto:
+      type: object
+      required:
+        - title
+        - description
+        - category
+        - createdBy
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          description: Short summary of the issue
+          example: Cannot access VPN
+        description:
+          type: string
+          maxLength: 2000
+          description: Full description of the issue
+          example: I have been unable to connect to the company VPN since yesterday morning. I get a timeout error every time I try.
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+          description: Defaults to MEDIUM if omitted
+        createdBy:
+          type: string
+          format: uuid
+          description: UUID of the user opening the ticket
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    UpdateTicketDto:
+      type: object
+      description: All fields are optional; only provided fields are updated
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          example: Cannot access company VPN (urgent)
+        description:
+          type: string
+          maxLength: 2000
+          example: Updated description with additional details about the issue.
+        category:
+          $ref: '#/components/schemas/TicketCategory'
+        priority:
+          $ref: '#/components/schemas/TicketPriority'
+        status:
+          $ref: '#/components/schemas/TicketStatus'
+        assignedTo:
+          type: string
+          format: uuid
+          description: UUID of the staff member to assign
+          example: b2c3d4e5-f6a7-8901-bcde-f12345678901
+
+    CreateMessageDto:
+      type: object
+      required:
+        - content
+        - authorId
+        - authorRole
+      properties:
+        content:
+          type: string
+          maxLength: 5000
+          description: Body of the message
+          example: I have tried restarting my machine and reinstalling the VPN client but the issue persists.
+        authorId:
+          type: string
+          format: uuid
+          description: UUID of the message author
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        authorRole:
+          $ref: '#/components/schemas/MessageAuthorRole'
+
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          example:
+            - title must be shorter than or equal to 200 characters
+            - category must be one of the following values IT, BILLING, ACCESS, OTHER
+        error:
+          type: string
+          example: Bad Request
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 400
+            message:
+              - title must be shorter than or equal to 200 characters
+              - category must be one of the following values IT, BILLING, ACCESS, OTHER
+            error: Bad Request
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 404
+            message: Ticket not found
+            error: Not Found
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 500
+            message: Internal server error
+            error: Internal Server Error

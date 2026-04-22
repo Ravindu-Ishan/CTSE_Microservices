@@ -1,0 +1,422 @@
+openapi: 3.0.3
+info:
+  title: OTSS Queue Service
+  description: >
+    Manages the ticket assignment queue for the OTSS platform.
+    Consumes `ticket.created` and `ticket.closed` events from Kafka,
+    auto-assigns tickets to the available staff member with the lowest load,
+    and exposes observability and manual-override endpoints for admin dashboards.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3040
+    description: Local development
+  - url: http://otss-queue-service:3040
+    description: Internal Docker network
+
+tags:
+  - name: Health
+    description: Liveness probe
+  - name: Queue
+    description: Queue entry management and observability
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      operationId: health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                service: otss-queue-service
+
+  /queue:
+    get:
+      tags:
+        - Queue
+      summary: List all queue entries with optional filters
+      operationId: findAll
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by queue entry status
+          schema:
+            $ref: '#/components/schemas/QueueEntryStatus'
+          example: PENDING
+        - name: ticketPriority
+          in: query
+          required: false
+          description: Filter by ticket priority
+          schema:
+            $ref: '#/components/schemas/TicketPriority'
+          example: HIGH
+        - name: ticketCategory
+          in: query
+          required: false
+          description: Filter by ticket category
+          schema:
+            $ref: '#/components/schemas/TicketCategory'
+          example: IT
+        - name: assignedStaffId
+          in: query
+          required: false
+          description: Filter by assigned staff member UUID
+          schema:
+            type: string
+            format: uuid
+          example: b2c3d4e5-f6a7-8901-bcde-f01234567890
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results to return (1–100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: offset
+          in: query
+          required: false
+          description: Number of results to skip for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          example: 0
+      responses:
+        '200':
+          description: Paginated list of queue entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueListResponse'
+              example:
+                entries:
+                  - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                    ticketId: ticket-001
+                    ticketPriority: HIGH
+                    ticketCategory: IT
+                    createdBy: c9d0e1f2-a3b4-5678-cdef-012345678901
+                    assignedStaffId: b2c3d4e5-f6a7-8901-bcde-f01234567890
+                    status: ASSIGNED
+                    assignedAt: '2024-01-15T09:30:00.000Z'
+                    completedAt: null
+                    createdAt: '2024-01-15T09:00:00.000Z'
+                    updatedAt: '2024-01-15T09:30:00.000Z'
+                total: 1
+                limit: 20
+                offset: 0
+
+  /queue/stats:
+    get:
+      tags:
+        - Queue
+      summary: Queue stats — pending, assigned, failed, completed counts
+      operationId: getStats
+      responses:
+        '200':
+          description: Aggregated status counts across all queue entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStatsResponse'
+              example:
+                pending: 5
+                assigned: 12
+                failed: 2
+                completed: 98
+                total: 117
+
+  /queue/{ticketId}:
+    get:
+      tags:
+        - Queue
+      summary: Get queue entry for a specific ticket
+      operationId: findByTicket
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          description: The ticket ID to look up in the queue
+          schema:
+            type: string
+          example: ticket-001
+      responses:
+        '200':
+          description: Queue entry for the given ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueEntry'
+              example:
+                id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                ticketId: ticket-001
+                ticketPriority: HIGH
+                ticketCategory: IT
+                createdBy: c9d0e1f2-a3b4-5678-cdef-012345678901
+                assignedStaffId: b2c3d4e5-f6a7-8901-bcde-f01234567890
+                status: ASSIGNED
+                assignedAt: '2024-01-15T09:30:00.000Z'
+                completedAt: null
+                createdAt: '2024-01-15T09:00:00.000Z'
+                updatedAt: '2024-01-15T09:30:00.000Z'
+        '404':
+          description: No queue entry found for the given ticket ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                message: Queue entry for ticket ticket-001 not found
+                error: Not Found
+
+  /queue/{ticketId}/assign:
+    post:
+      tags:
+        - Queue
+      summary: Manually assign a ticket to a specific staff member
+      operationId: manualAssign
+      description: >
+        Admin override — bypasses auto-assignment logic.
+        Use for high priority tickets or VIP customers.
+        If the ticket was previously assigned to a different staff member,
+        that staff member's load is decremented before the new assignment is applied.
+        Throws 400 if the ticket is already completed.
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          description: The ticket ID to assign
+          schema:
+            type: string
+          example: ticket-001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualAssignDto'
+            example:
+              staffId: b2c3d4e5-f6a7-8901-bcde-f01234567890
+      responses:
+        '201':
+          description: Assignment applied successfully (no response body)
+        '400':
+          description: Ticket is already completed and cannot be reassigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                message: Ticket ticket-001 is already completed
+                error: Bad Request
+        '404':
+          description: No queue entry found for the given ticket ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                message: Queue entry for ticket ticket-001 not found
+                error: Not Found
+
+components:
+  schemas:
+    QueueEntryStatus:
+      type: string
+      enum:
+        - PENDING
+        - ASSIGNED
+        - COMPLETED
+        - FAILED
+      description: >
+        Lifecycle state of a queue entry.
+        PENDING: ticket.created consumed, finding available staff.
+        ASSIGNED: staff assigned, ticket is IN_PROGRESS.
+        COMPLETED: ticket closed or resolved.
+        FAILED: could not assign — no available staff at the time.
+
+    TicketPriority:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - URGENT
+
+    TicketCategory:
+      type: string
+      enum:
+        - IT
+        - BILLING
+        - ACCESS
+        - OTHER
+
+    QueueEntry:
+      type: object
+      required:
+        - id
+        - ticketId
+        - ticketPriority
+        - ticketCategory
+        - createdBy
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Auto-generated UUID primary key
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        ticketId:
+          type: string
+          description: Unique reference to the originating ticket
+          example: ticket-001
+        ticketPriority:
+          $ref: '#/components/schemas/TicketPriority'
+        ticketCategory:
+          $ref: '#/components/schemas/TicketCategory'
+        createdBy:
+          type: string
+          description: User ID of the customer who created the ticket
+          example: c9d0e1f2-a3b4-5678-cdef-012345678901
+        assignedStaffId:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the staff member currently assigned, or null if unassigned
+          example: b2c3d4e5-f6a7-8901-bcde-f01234567890
+        status:
+          $ref: '#/components/schemas/QueueEntryStatus'
+        assignedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp when staff was assigned
+          example: '2024-01-15T09:30:00.000Z'
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp when the ticket was closed/resolved
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the queue entry was created
+          example: '2024-01-15T09:00:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the last update (auto-managed)
+          example: '2024-01-15T09:30:00.000Z'
+
+    ManualAssignDto:
+      type: object
+      required:
+        - staffId
+      properties:
+        staffId:
+          type: string
+          format: uuid
+          description: Staff member ID to assign the ticket to
+          example: b2c3d4e5-f6a7-8901-bcde-f01234567890
+
+    QueueListResponse:
+      type: object
+      required:
+        - entries
+        - total
+        - limit
+        - offset
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueEntry'
+        total:
+          type: integer
+          description: Total number of matching queue entries (ignoring pagination)
+          example: 42
+        limit:
+          type: integer
+          description: The limit value used for this page
+          example: 20
+        offset:
+          type: integer
+          description: The offset value used for this page
+          example: 0
+
+    QueueStatsResponse:
+      type: object
+      required:
+        - pending
+        - assigned
+        - failed
+        - completed
+        - total
+      properties:
+        pending:
+          type: integer
+          description: Number of entries in PENDING state
+          example: 5
+        assigned:
+          type: integer
+          description: Number of entries in ASSIGNED state
+          example: 12
+        failed:
+          type: integer
+          description: Number of entries in FAILED state (no staff available at creation time)
+          example: 2
+        completed:
+          type: integer
+          description: Number of entries in COMPLETED state
+          example: 98
+        total:
+          type: integer
+          description: Sum of all status counts
+          example: 117
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: otss-queue-service
+
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - error
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: Queue entry for ticket ticket-001 not found
+        error:
+          type: string
+          example: Not Found
