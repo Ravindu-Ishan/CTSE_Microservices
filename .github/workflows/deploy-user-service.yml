@@ -91,6 +91,9 @@ jobs:
       - name: Deploy user service
         run: kubectl apply -f k8s/user-service/deployment.yaml
 
+      - name: Restart deployment to pick up new image
+        run: kubectl rollout restart deployment/user-service -n ${{ env.NAMESPACE }}
+
       - name: Verify deployment
         run: |
           kubectl rollout status deployment/user-service \

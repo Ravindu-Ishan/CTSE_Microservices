@@ -88,6 +88,9 @@ jobs:
       - name: Deploy ticket service
         run: kubectl apply -f k8s/ticket-service/deployment.yaml
 
+      - name: Restart deployment to pick up new image
+        run: kubectl rollout restart deployment/ticket-service -n ${{ env.NAMESPACE }}
+
       - name: Verify deployment
         run: |
           kubectl rollout status deployment/ticket-service \
