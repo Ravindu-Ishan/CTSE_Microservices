@@ -33,7 +33,9 @@ FROM node:24-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl wget && \
+    mkdir -p /app/certs && \
+    wget -O /app/certs/rds-ca.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
