@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { UserProfile, UserRole } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -37,14 +38,22 @@ export interface TimelineUpdates {
 @Injectable()
 export class IdentityUserSyncService {
   private readonly logger = new Logger(IdentityUserSyncService.name);
+  private readonly staffGroupName: string;
+  private readonly adminGroupName: string | undefined;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    this.staffGroupName = this.config.getOrThrow<string>('WSO2_STAFF_GROUP');
+    this.adminGroupName = this.config.get<string>('WSO2_ADMIN_GROUP');
+  }
 
-  async syncUser(userPayload: unknown, timeline?: TimelineUpdates): Promise<UserProfile> {
+  async syncUser(userPayload: unknown, timeline?: TimelineUpdates, groups?: string[]): Promise<UserProfile> {
     const dto = this.validateUserPayload(userPayload);
     const existing = await this.prisma.userProfile.findUnique({ where: { id: dto.id } });
     const claimMap = this.buildClaimMap(dto);
-    const profileData = this.buildProfileData(claimMap, existing ?? undefined);
+    const profileData = this.buildProfileData(claimMap, existing ?? undefined, groups);
     const timelineData = this.stripUndefined(timeline ?? {});
 
     return this.prisma.userProfile.upsert({
@@ -88,7 +97,7 @@ export class IdentityUserSyncService {
     return aggregated;
   }
 
-  private buildProfileData(claimMap: Map<string, string>, existing?: UserProfile) {
+  private buildProfileData(claimMap: Map<string, string>, existing?: UserProfile, groups?: string[]) {
     const username =
       this.resolveClaim(claimMap, CLAIM_URIS.USERNAME) ??
       existing?.username ??
@@ -114,7 +123,7 @@ export class IdentityUserSyncService {
     const language = this.resolveClaim(claimMap, CLAIM_URIS.LANGUAGE) ?? existing?.language;
 
     const roleTokens = this.parseRoleTokens(this.resolveClaim(claimMap, CLAIM_URIS.ROLES));
-    const role = this.resolveRole(roleTokens, existing?.role);
+    const role = this.resolveRole(roleTokens, existing?.role, groups);
 
     return this.stripUndefined({ username: username || undefined, email, firstName, lastName, phoneNumber, timezone, language, role });
   }
@@ -135,7 +144,12 @@ export class IdentityUserSyncService {
       .filter((token) => token.length > 0);
   }
 
-  private resolveRole(tokens: string[], currentRole?: UserRole): UserRole {
+  private resolveRole(tokens: string[], currentRole?: UserRole, groups?: string[]): UserRole {
+    if (groups !== undefined) {
+      if (this.adminGroupName && groups.includes(this.adminGroupName)) return UserRole.ADMIN;
+      if (groups.includes(this.staffGroupName)) return UserRole.STAFF;
+      return UserRole.END_USER;
+    }
     if (tokens.includes('ADMIN')) return UserRole.ADMIN;
     if (tokens.includes('STAFF')) return UserRole.STAFF;
     return currentRole ?? UserRole.END_USER;

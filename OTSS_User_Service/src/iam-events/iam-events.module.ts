@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StaffModule } from '../staff/staff.module';
+import { Wso2ScimModule } from '../wso2-scim/wso2-scim.module';
 import { CredentialUpdatedService } from './credential/credential-updated.service';
 import { IamEventsController } from './iam-events.controller';
 import { IamEventsDispatcherService } from './iam-events.dispatcher.service';
@@ -19,7 +20,7 @@ import { UserDeletedService } from './user/user-deleted.service';
 import { UserProfileUpdatedService } from './user/user-profile-updated.service';
 
 @Module({
-  imports: [PrismaModule, StaffModule],
+  imports: [PrismaModule, StaffModule, Wso2ScimModule],
   controllers: [IamEventsController],
   providers: [
     WebhookSignatureGuard,

@@ -34,6 +34,10 @@ spec:
               value: "false"
             - name: WSO2_END_USER_GROUP
               value: "OTS_END_USER"
+            - name: WSO2_STAFF_GROUP
+              value: "OTS_STAFF"
+            - name: WSO2_ADMIN_GROUP
+              value: "OTS_ADMIN"
             - name: WSO2_SCIM_BASE_URL
               value: "https://wso2-is-identity-server.otss.svc.cluster.local:9443"
             - name: DATABASE_URL
