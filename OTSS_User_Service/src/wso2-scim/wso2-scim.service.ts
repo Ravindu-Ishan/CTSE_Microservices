@@ -135,9 +135,7 @@ export class Wso2ScimService {
     );
 
     const groups = (response.data as { groups?: { display: string }[] }).groups ?? [];
-    const names = groups.map((g) => g.display).filter(Boolean);
-    this.logger.log({ userId, groups: names }, 'Fetched WSO2 groups for user');
-    return names;
+    return groups.map((g) => g.display).filter(Boolean);
   }
 
   async deleteUser(wso2Id: string): Promise<void> {
