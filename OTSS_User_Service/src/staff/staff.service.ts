@@ -47,10 +47,11 @@ export class StaffService {
 	}
 
 	private buildCreateStatusInput(profileId: string, payload: UpdateStaffStatusDto): Prisma.SupportStaffStatusCreateInput {
+		const currentLoad = typeof payload.currentLoad === 'number' ? payload.currentLoad : 0;
 		return {
 			profile: { connect: { id: profileId } },
 			isOnline: payload.isOnline ?? false,
-			currentLoad: payload.currentLoad ?? 0,
+			currentLoad,
 			maxLoad: payload.maxLoad ?? 5,
 			categories: payload.categories ?? [],
 		};
@@ -60,7 +61,17 @@ export class StaffService {
 		const data: Prisma.SupportStaffStatusUpdateInput = {};
 
 		if (payload.isOnline !== undefined) data.isOnline = payload.isOnline;
-		if (payload.currentLoad !== undefined) data.currentLoad = payload.currentLoad;
+		if (payload.currentLoad !== undefined) {
+			if (payload.currentLoad === 'increment') {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				data.currentLoad = { increment: 1 } as any;
+			} else if (payload.currentLoad === 'decrement') {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				data.currentLoad = { decrement: 1 } as any;
+			} else {
+				data.currentLoad = payload.currentLoad;
+			}
+		}
 		if (payload.maxLoad !== undefined) data.maxLoad = payload.maxLoad;
 		if (payload.categories !== undefined) data.categories = payload.categories;
 

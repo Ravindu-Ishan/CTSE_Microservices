@@ -5,10 +5,12 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdateStaffStatusDto {
@@ -17,10 +19,12 @@ export class UpdateStaffStatusDto {
   isOnline?: boolean;
 
   @IsOptional()
-  @Type(() => Number)
+  @ValidateIf((o: UpdateStaffStatusDto) => typeof o.currentLoad === 'string')
+  @IsIn(['increment', 'decrement'])
+  @ValidateIf((o: UpdateStaffStatusDto) => typeof o.currentLoad === 'number')
   @IsInt()
   @Min(0)
-  currentLoad?: number;
+  currentLoad?: number | 'increment' | 'decrement';
 
   @IsOptional()
   @Type(() => Number)
