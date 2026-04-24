@@ -6,9 +6,27 @@ info:
     Manages user registration via WSO2 SCIM2, IAM-synced user profiles,
     and support-staff availability data used by Queue/Ticket services.
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:3010
     description: Local development server
 paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+              example:
+                status: ok
+
   /users/register:
     post:
       summary: Register a new end user
@@ -20,6 +38,15 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/RegisterUserDto'
+            example:
+              username: john_doe
+              email: john@example.com
+              password: Secret123!
+              firstName: John
+              lastName: Doe
+              phoneNumber: '+1234567890'
+              timezone: Asia/Colombo
+              language: en
       responses:
         '201':
           description: User registered successfully
@@ -27,35 +54,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Profile'
+              example:
+                id: 9f2d1b3e-4a5c-6d7e-8f9a-0b1c2d3e4f5a
+                username: john_doe
+                email: john@example.com
+                firstName: John
+                lastName: Doe
+                phoneNumber: '+1234567890'
+                timezone: Asia/Colombo
+                language: en
+                role: END_USER
+                lastLoginAt: null
+                lastRegistrationAt: '2024-01-15T10:30:00Z'
+                lastTokenIssuedAt: null
+                lastTokenRevokedAt: null
+                lastSessionActivityAt: null
+                lastCredentialUpdateAt: null
+                createdAt: '2024-01-15T10:30:00Z'
+                updatedAt: '2024-01-15T10:30:00Z'
+                staffStatus: null
         '400':
           description: Validation failed
-        '500':
-          description: WSO2 provisioning failed
-
-  /users/register/staff:
-    post:
-      summary: Register a new staff member
-      description: >
-        Provisions the user in WSO2 IS via SCIM2, then creates a local profile with STAFF role.
-        Requires admin authentication (AdminGuard — TODO).
-      tags: [Users]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RegisterStaffDto'
-      responses:
-        '201':
-          description: Staff member registered successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Profile'
-        '400':
-          description: Validation failed
-        '401':
-          description: Unauthorized
         '500':
           description: WSO2 provisioning failed
 
@@ -67,6 +86,7 @@ paths:
         - in: query
           name: email
           schema: { type: string, format: email }
+          example: john@example.com
         - in: query
           name: role
           schema:
@@ -110,7 +130,8 @@ paths:
           schema: { type: boolean }
         - in: query
           name: hasCapacity
-          schema: { type: boolean, description: Return only staff with load < maxLoad }
+          description: Return only staff with currentLoad < maxLoad
+          schema: { type: boolean }
         - in: query
           name: limit
           schema:
@@ -138,12 +159,19 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
+          example: 9f2d1b3e-4a5c-6d7e-8f9a-0b1c2d3e4f5a
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateStaffStatusDto'
+            example:
+              isOnline: true
+              currentLoad: 2
+              maxLoad: 5
+              categories: [IT, BILLING]
       responses:
         '200':
           description: Updated staff status
@@ -154,77 +182,43 @@ paths:
         '404':
           description: Staff profile missing or not marked as staff
 
-  /events/login:
+  /events:
     post:
-      summary: WSO2 login event webhook
+      summary: WSO2 IAM event webhook — all event types
+      description: >
+        Single entry point for all WSO2 Identity Server webhook events (login, session,
+        token, credential, user-management). The event type is discriminated internally
+        by the dispatcher. Requires a valid HMAC-SHA256 signature in the X-Hub-Signature-256 header.
       tags: [IAM Events]
+      security:
+        - webhookSignature: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CloudEventPayload'
-      responses:
-        '200':
-          description: Event processed
-
-  /events/session:
-    post:
-      summary: WSO2 session event webhook
-      tags: [IAM Events]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CloudEventPayload'
-      responses:
-        '200':
-          description: Event processed
-
-  /events/token:
-    post:
-      summary: WSO2 token event webhook
-      tags: [IAM Events]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CloudEventPayload'
-      responses:
-        '200':
-          description: Event processed
-
-  /events/credential:
-    post:
-      summary: WSO2 credential event webhook
-      tags: [IAM Events]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CloudEventPayload'
-      responses:
-        '200':
-          description: Event processed
-
-  /events/user-management:
-    post:
-      summary: WSO2 user management event webhook
-      tags: [IAM Events]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CloudEventPayload'
+            example:
+              specversion: '1.0'
+              type: com.wso2.identity.event.credential.update
+              source: https://wso2.example.com
+              id: evt-abc123
+              time: '2024-01-15T10:30:00Z'
+              data:
+                user:
+                  id: 00000001-0000-0000-0000-000000000001
+                  claims: []
       responses:
         '200':
           description: Event processed
 
 components:
+  securitySchemes:
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: X-Hub-Signature-256
+      description: HMAC-SHA256 signature of the raw request body
   parameters:
     ProfileId:
       name: id
@@ -232,6 +226,7 @@ components:
       required: true
       schema:
         type: string
+      example: 9f2d1b3e-4a5c-6d7e-8f9a-0b1c2d3e4f5a
   schemas:
     UserRole:
       type: string
@@ -241,87 +236,185 @@ components:
       enum: [IT, BILLING, ACCESS, OTHER]
     RegisterUserDto:
       type: object
-      required: [email, password, firstName, lastName]
+      required: [username, email, password, firstName, lastName]
       properties:
+        username:
+          type: string
+          pattern: '^[a-zA-Z0-9._-]+$'
+          description: Alphanumeric with dots, underscores, and hyphens
+          example: john_doe
         email:
           type: string
           format: email
+          example: john@example.com
         password:
           type: string
           minLength: 8
-        firstName: { type: string }
-        lastName: { type: string }
-        phoneNumber: { type: string }
-        timezone: { type: string }
-        language: { type: string }
+          example: Secret123!
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          example: '+1234567890'
+        timezone:
+          type: string
+          example: Asia/Colombo
+        language:
+          type: string
+          example: en
       additionalProperties: false
-    RegisterStaffDto:
-      allOf:
-        - $ref: '#/components/schemas/RegisterUserDto'
-        - type: object
-          properties:
-            staff:
-              $ref: '#/components/schemas/StaffProfileInputDto'
-          additionalProperties: false
     StaffProfileInputDto:
       type: object
       properties:
-        isOnline: { type: boolean }
+        isOnline:
+          type: boolean
+          example: true
         currentLoad:
           type: integer
           minimum: 0
+          example: 2
         maxLoad:
           type: integer
           minimum: 1
           maximum: 50
           default: 5
+          example: 5
         categories:
           type: array
           items: { $ref: '#/components/schemas/TicketCategory' }
+          uniqueItems: true
+          example: [IT, BILLING]
       additionalProperties: false
     UpdateStaffStatusDto:
       $ref: '#/components/schemas/StaffProfileInputDto'
     Profile:
       type: object
       properties:
-        id: { type: string }
-        email: { type: string, format: email }
-        firstName: { type: string }
-        lastName: { type: string }
-        phoneNumber: { type: string }
-        timezone: { type: string }
-        language: { type: string }
-        role: { $ref: '#/components/schemas/UserRole' }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+        id:
+          type: string
+          example: 9f2d1b3e-4a5c-6d7e-8f9a-0b1c2d3e4f5a
+        username:
+          type: string
+          example: john_doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          example: '+1234567890'
+        timezone:
+          type: string
+          example: Asia/Colombo
+        language:
+          type: string
+          example: en
+        role:
+          $ref: '#/components/schemas/UserRole'
+        lastLoginAt:
+          type: [string, 'null']
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
+        lastRegistrationAt:
+          type: [string, 'null']
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
+        lastTokenIssuedAt:
+          type: [string, 'null']
+          format: date-time
+          example: null
+        lastTokenRevokedAt:
+          type: [string, 'null']
+          format: date-time
+          example: null
+        lastSessionActivityAt:
+          type: [string, 'null']
+          format: date-time
+          example: null
+        lastCredentialUpdateAt:
+          type: [string, 'null']
+          format: date-time
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
         staffStatus:
-          $ref: '#/components/schemas/StaffStatus'
+          oneOf:
+            - $ref: '#/components/schemas/StaffStatus'
+            - type: 'null'
       additionalProperties: false
     StaffStatus:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        profileId: { type: string }
-        isOnline: { type: boolean }
-        currentLoad: { type: integer }
-        maxLoad: { type: integer }
+        id:
+          type: string
+          format: uuid
+          example: 7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d
+        profileId:
+          type: string
+          example: 9f2d1b3e-4a5c-6d7e-8f9a-0b1c2d3e4f5a
+        isOnline:
+          type: boolean
+          example: true
+        currentLoad:
+          type: integer
+          example: 2
+        maxLoad:
+          type: integer
+          example: 5
         categories:
           type: array
           items: { $ref: '#/components/schemas/TicketCategory' }
-        updatedAt: { type: string, format: date-time }
+          uniqueItems: true
+          example: [IT, BILLING]
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
       additionalProperties: false
     StaffStatusWithProfile:
       type: object
       properties:
-        id: { type: string, format: uuid }
-        profileId: { type: string }
-        isOnline: { type: boolean }
-        currentLoad: { type: integer }
-        maxLoad: { type: integer }
+        id:
+          type: string
+          format: uuid
+          example: 7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d
+        profileId:
+          type: string
+          example: 9f2d1b3e-4a5c-6d7e-8f9a-0b1c2d3e4f5a
+        isOnline:
+          type: boolean
+          example: true
+        currentLoad:
+          type: integer
+          example: 2
+        maxLoad:
+          type: integer
+          example: 5
         categories:
           type: array
           items: { $ref: '#/components/schemas/TicketCategory' }
-        updatedAt: { type: string, format: date-time }
+          uniqueItems: true
+          example: [IT, BILLING]
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
         profile:
           $ref: '#/components/schemas/Profile'
       additionalProperties: false
@@ -329,10 +422,24 @@ components:
       type: object
       description: WSO2 CloudEvents webhook payload
       properties:
-        specversion: { type: string }
-        type: { type: string }
-        source: { type: string }
-        id: { type: string }
-        time: { type: string, format: date-time }
-        data: { type: object }
+        specversion:
+          type: string
+          example: '1.0'
+        type:
+          type: string
+          description: Event type identifier (e.g. com.wso2.identity.event.login.success)
+          example: com.wso2.identity.event.login.success
+        source:
+          type: string
+          example: https://wso2.example.com
+        id:
+          type: string
+          example: evt-abc123
+        time:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00Z'
+        data:
+          type: object
+          description: Event-specific payload; shape depends on event type
       additionalProperties: true

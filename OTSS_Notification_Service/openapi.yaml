@@ -1,0 +1,245 @@
+openapi: 3.0.3
+info:
+  title: OTSS Notification Service
+  description: >
+    Microservice responsible for consuming ticket events from Kafka and
+    dispatching email notifications to users. Provides endpoints for
+    querying notification history.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3050
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health check
+  - name: Notifications
+    description: Notification history queries
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                service: otss-notification-service
+
+  /notifications/user/{userId}:
+    get:
+      tags:
+        - Notifications
+      summary: Get notifications by user ID
+      description: >
+        Returns all notification log entries for a specific recipient user,
+        ordered by sentAt descending (most recent first).
+      operationId: getNotificationsByUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: The recipient user's ID
+          schema:
+            type: string
+            example: user-abc-123
+        - name: type
+          in: query
+          required: false
+          description: Filter by notification type
+          schema:
+            $ref: '#/components/schemas/NotificationType'
+        - name: status
+          in: query
+          required: false
+          description: Filter by notification delivery status
+          schema:
+            $ref: '#/components/schemas/NotificationStatus'
+      responses:
+        '200':
+          description: List of notification logs for the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationLog'
+              example:
+                - id: 550e8400-e29b-41d4-a716-446655440000
+                  ticketId: ticket-xyz-789
+                  recipientEmail: john.doe@example.com
+                  recipientUserId: user-abc-123
+                  type: TICKET_CREATED
+                  status: SENT
+                  subject: 'Your support ticket has been created'
+                  errorMessage: null
+                  sentAt: '2026-04-22T10:30:00.000Z'
+                - id: 660e8400-e29b-41d4-a716-446655440001
+                  ticketId: ticket-xyz-789
+                  recipientEmail: john.doe@example.com
+                  recipientUserId: user-abc-123
+                  type: TICKET_CLOSED
+                  status: SENT
+                  subject: 'Your support ticket has been resolved'
+                  errorMessage: null
+                  sentAt: '2026-04-22T14:00:00.000Z'
+
+  /notifications/ticket/{ticketId}:
+    get:
+      tags:
+        - Notifications
+      summary: Get notifications by ticket ID
+      description: >
+        Returns all notification log entries associated with a specific ticket,
+        ordered by sentAt descending (most recent first).
+      operationId: getNotificationsByTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          description: The ticket ID to retrieve notifications for
+          schema:
+            type: string
+            example: ticket-xyz-789
+        - name: type
+          in: query
+          required: false
+          description: Filter by notification type
+          schema:
+            $ref: '#/components/schemas/NotificationType'
+        - name: status
+          in: query
+          required: false
+          description: Filter by notification delivery status
+          schema:
+            $ref: '#/components/schemas/NotificationStatus'
+      responses:
+        '200':
+          description: List of notification logs for the ticket
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationLog'
+              example:
+                - id: 550e8400-e29b-41d4-a716-446655440000
+                  ticketId: ticket-xyz-789
+                  recipientEmail: john.doe@example.com
+                  recipientUserId: user-abc-123
+                  type: TICKET_CREATED
+                  status: SENT
+                  subject: 'Your support ticket has been created'
+                  errorMessage: null
+                  sentAt: '2026-04-22T10:30:00.000Z'
+                - id: 770e8400-e29b-41d4-a716-446655440002
+                  ticketId: ticket-xyz-789
+                  recipientEmail: john.doe@example.com
+                  recipientUserId: user-abc-123
+                  type: TICKET_REPLY
+                  status: FAILED
+                  subject: 'A support agent has replied to your ticket'
+                  errorMessage: 'SMTP connection refused'
+                  sentAt: '2026-04-22T12:15:00.000Z'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from WSO2 Identity Server
+
+  schemas:
+    NotificationType:
+      type: string
+      enum:
+        - TICKET_CREATED
+        - TICKET_REPLY
+        - TICKET_CLOSED
+      description: The event that triggered the notification
+      example: TICKET_CREATED
+
+    NotificationStatus:
+      type: string
+      enum:
+        - SENT
+        - FAILED
+      description: Whether the notification email was delivered successfully
+      example: SENT
+
+    NotificationLog:
+      type: object
+      description: A persisted record of an attempted notification dispatch
+      required:
+        - id
+        - ticketId
+        - recipientEmail
+        - recipientUserId
+        - type
+        - status
+        - subject
+        - sentAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the notification log entry
+          example: 550e8400-e29b-41d4-a716-446655440000
+        ticketId:
+          type: string
+          description: ID of the ticket that triggered this notification
+          example: ticket-xyz-789
+        recipientEmail:
+          type: string
+          format: email
+          description: Email address the notification was sent to
+          example: john.doe@example.com
+        recipientUserId:
+          type: string
+          description: User ID of the notification recipient
+          example: user-abc-123
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        subject:
+          type: string
+          description: Email subject line used for this notification
+          example: 'Your support ticket has been created'
+        errorMessage:
+          type: string
+          nullable: true
+          description: SMTP or dispatch error message if status is FAILED, null otherwise
+          example: null
+        sentAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of when the notification was attempted
+          example: '2026-04-22T10:30:00.000Z'
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: otss-notification-service
