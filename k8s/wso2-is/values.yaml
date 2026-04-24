@@ -32,7 +32,7 @@ deployment:
     enabled: false
 
   ingress:
-    hostName: "wso2is.otss.internal"
+    hostName: "iam.raizuraiprojects.dpdns.org"
     ingressClassName: "alb"
     tlsSecretsName: ""
     azure:
@@ -205,6 +205,19 @@ deploymentToml:
       autoUnlockAfter: 5
 
   extraConfigs: |
+    [server]
+    hostname = "iam.raizuraiprojects.dpdns.org"
+    internal_hostname = "wso2-is-identity-server.otss.svc.cluster.local"
+
+    [transport.https.properties]
+    proxyPort = 443
+
+    [console]
+    callback_url = "https://iam.raizuraiprojects.dpdns.org/console"
+
+    [myaccount]
+    callback_url = "https://iam.raizuraiprojects.dpdns.org/myaccount"
+
     [[resource.access_control]]
     context="(.*)/scim2/Me"
     secure=true
