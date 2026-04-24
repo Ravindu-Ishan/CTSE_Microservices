@@ -146,6 +146,7 @@ export class IdentityUserSyncService {
 
   private resolveRole(tokens: string[], currentRole?: UserRole, groups?: string[]): UserRole {
     if (groups !== undefined) {
+      this.logger.log({ groups, staffGroupName: this.staffGroupName }, 'Resolving role from WSO2 groups');
       if (this.adminGroupName && groups.includes(this.adminGroupName)) return UserRole.ADMIN;
       if (groups.includes(this.staffGroupName)) return UserRole.STAFF;
       return UserRole.END_USER;
