@@ -11,27 +11,30 @@ import MessageThread from '@/components/tickets/MessageThread';
 import Button from '@/components/ui/Button';
 import Card, { CardTitle } from '@/components/ui/Card';
 import { PageSpinner } from '@/components/ui/Spinner';
+import { useAppSession } from '@/components/AppSessionContext';
 
 export default function AdminTicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { accessToken, isLoading: sessionLoading } = useAppSession();
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [queueEntry, setQueueEntry] = useState<QueueEntry | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (sessionLoading || !accessToken) return;
     Promise.all([
-      getTicket(id),
-      getMessages(id),
-      getQueueEntry(id).catch(() => null),
+      getTicket(id, accessToken),
+      getMessages(id, accessToken),
+      getQueueEntry(id, accessToken).catch(() => null),
     ]).then(([t, m, q]) => {
       setTicket(t);
       setMessages(m);
       setQueueEntry(q);
     }).finally(() => setLoading(false));
-  }, [id]);
+  }, [id, sessionLoading, accessToken]);
 
-  if (loading) return <PageSpinner />;
+  if (sessionLoading || loading) return <PageSpinner />;
   if (!ticket) return <p className="text-slate-400">Ticket not found.</p>;
 
   return (

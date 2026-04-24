@@ -4,13 +4,22 @@ import type { UserRole } from '@/lib/types/user';
 
 export const dynamic = 'force-dynamic';
 
+function toArr(v: unknown): string[] {
+  if (Array.isArray(v)) return v as string[];
+  if (typeof v === 'string') return [v];
+  return [];
+}
+
 function extractRole(claims: Record<string, unknown>): UserRole | null {
-  const raw = claims?.roles ?? claims?.['http://wso2.org/claims/roles'] ?? claims?.groups;
-  const arr = (Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : []) as string[];
-  // Direct role names (if WSO2 returns them directly)
-  if (arr.includes('ADMIN') || arr.includes('admin')) return 'ADMIN';
-  if (arr.includes('STAFF') || arr.includes('OTS_STAFF')) return 'STAFF';
-  if (arr.includes('END_USER') || arr.includes('OTS_END_USER')) return 'END_USER';
+  // Collect all values from every claims field that could carry role/group info
+  const all = [
+    ...toArr(claims?.roles),
+    ...toArr(claims?.['http://wso2.org/claims/roles']),
+    ...toArr(claims?.groups),
+  ];
+  if (all.some((v) => ['ADMIN', 'admin', 'OTS_ADMIN'].includes(v))) return 'ADMIN';
+  if (all.some((v) => ['STAFF', 'OTS_STAFF'].includes(v))) return 'STAFF';
+  if (all.some((v) => ['END_USER', 'OTS_END_USER'].includes(v))) return 'END_USER';
   return null;
 }
 

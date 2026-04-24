@@ -8,6 +8,7 @@ import Select from '@/components/ui/Select';
 import Card from '@/components/ui/Card';
 import Link from 'next/link';
 import { PageSpinner } from '@/components/ui/Spinner';
+import { useAppSession } from '@/components/AppSessionContext';
 
 const statusOptions = [
   { value: '', label: 'All Statuses' },
@@ -26,18 +27,20 @@ const categoryOptions = [
 ];
 
 export default function AdminTicketsPage() {
+  const { accessToken, isLoading: sessionLoading } = useAppSession();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
 
   useEffect(() => {
-    listTickets({ limit: 100 })
+    if (sessionLoading || !accessToken) return;
+    listTickets({ limit: 100 }, accessToken)
       .then(setTickets)
       .finally(() => setLoading(false));
-  }, []);
+  }, [sessionLoading, accessToken]);
 
-  if (loading) return <PageSpinner />;
+  if (sessionLoading || loading) return <PageSpinner />;
 
   const filtered = tickets.filter((t) => {
     if (statusFilter && t.status !== statusFilter) return false;
