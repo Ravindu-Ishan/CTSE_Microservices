@@ -64,7 +64,7 @@ export default function TicketList({ tickets, hrefPrefix }: TicketListProps) {
           <p className="text-sm">No tickets found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
           {filtered.map((ticket) => (
             <TicketCard key={ticket.id} ticket={ticket} href={`${hrefPrefix}/${ticket.id}`} />
           ))}

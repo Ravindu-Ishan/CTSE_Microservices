@@ -47,7 +47,7 @@ export default function UserTicketDetailPage({ params }: { params: Promise<{ id:
   const isClosed = ticket.status === 'CLOSED' || ticket.status === 'RESOLVED';
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       {/* Back */}
       <Link href="/dashboard/tickets">
         <Button variant="ghost" size="sm">

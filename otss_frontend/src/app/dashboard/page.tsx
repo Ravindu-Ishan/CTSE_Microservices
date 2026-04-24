@@ -37,11 +37,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-100">
-          Welcome back, {displayName?.split(' ')[0] ?? 'Player'}
-        </h1>
-        <p className="text-slate-400 mt-1 text-sm">Here&apos;s what&apos;s happening with your support tickets.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100">
+            Welcome back, {displayName?.split(' ')[0] ?? 'Player'}
+          </h1>
+          <p className="text-slate-400 mt-1 text-sm">Here&apos;s what&apos;s happening with your support tickets.</p>
+        </div>
+        <Link href="/dashboard/tickets/new" className="shrink-0 mt-1">
+          <Button size="lg">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Ticket
+          </Button>
+        </Link>
       </div>
 
       {/* Stats */}
@@ -112,16 +122,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div>
-        <Link href="/dashboard/tickets/new">
-          <Button size="lg">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Open New Ticket
-          </Button>
-        </Link>
-      </div>
     </div>
   );
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAsgardeo } from '@asgardeo/nextjs';
 import { useAppSession } from '@/components/AppSessionContext';
 import type { UserRole } from '@/lib/types/user';
 
@@ -51,7 +50,6 @@ const roleRoot: Record<UserRole, string> = {
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const { role, displayName, isLoading } = useAppSession();
-  const { signOut } = useAsgardeo();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,8 +66,13 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const effectiveRole: UserRole = role ?? 'END_USER';
   const items = navItems(effectiveRole);
 
+
   const handleSignOut = async () => {
-    await signOut?.();
+    const res = await fetch('/api/auth/signout', { method: 'POST' });
+    const { logoutUrl } = await res.json();
+    // Clear sessionStorage then redirect to WSO2 logout which clears the SSO session
+    sessionStorage.clear();
+    window.location.href = logoutUrl;
   };
 
   const SidebarContent = () => (
