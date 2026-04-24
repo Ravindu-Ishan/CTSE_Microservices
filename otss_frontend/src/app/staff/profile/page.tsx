@@ -17,21 +17,40 @@ export default function StaffProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Local draft state for categories and capacity
+  const [editingCategories, setEditingCategories] = useState(false);
+  const [draftCategories, setDraftCategories] = useState<TicketCategory[]>([]);
+
+  const [editingCapacity, setEditingCapacity] = useState(false);
+  const [draftMaxLoad, setDraftMaxLoad] = useState<number>(5);
+
   useEffect(() => {
     if (sessionLoading || !profileId) return;
     getProfile(profileId, accessToken ?? undefined)
-      .then(setProfile)
+      .then((p) => {
+        setProfile(p);
+        setDraftCategories(p.staffStatus?.categories ?? []);
+        setDraftMaxLoad(p.staffStatus?.maxLoad ?? 5);
+      })
       .finally(() => setLoading(false));
   }, [sessionLoading, profileId, accessToken]);
+
+  const refetchProfile = async () => {
+    if (!profileId) return;
+    const p = await getProfile(profileId, accessToken ?? undefined);
+    setProfile(p);
+    setDraftCategories(p.staffStatus?.categories ?? []);
+    setDraftMaxLoad(p.staffStatus?.maxLoad ?? 5);
+  };
 
   const handleToggleOnline = async () => {
     if (!profile || !profileId) return;
     setSaving(true);
     try {
-      const updated = await updateStaffStatus(profileId, {
+      await updateStaffStatus(profileId, {
         isOnline: !profile.staffStatus?.isOnline,
       }, accessToken ?? undefined);
-      setProfile(updated);
+      await refetchProfile();
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -39,30 +58,38 @@ export default function StaffProfilePage() {
     }
   };
 
-  const handleToggleCategory = async (cat: TicketCategory) => {
-    if (!profile?.staffStatus || !profileId) return;
-    const current = profile.staffStatus.categories;
-    const updated = current.includes(cat)
-      ? current.filter((c) => c !== cat)
-      : [...current, cat];
+  const handleSaveCategories = async () => {
+    if (!profileId) return;
     setSaving(true);
     try {
-      const res = await updateStaffStatus(profileId, { categories: updated }, accessToken ?? undefined);
-      setProfile(res);
+      await updateStaffStatus(profileId, { categories: draftCategories }, accessToken ?? undefined);
+      await refetchProfile();
+      setEditingCategories(false);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCapacityChange = async (maxLoad: number) => {
+  const handleCancelCategories = () => {
+    setDraftCategories(profile?.staffStatus?.categories ?? []);
+    setEditingCategories(false);
+  };
+
+  const handleSaveCapacity = async () => {
     if (!profileId) return;
     setSaving(true);
     try {
-      const res = await updateStaffStatus(profileId, { maxLoad }, accessToken ?? undefined);
-      setProfile(res);
+      await updateStaffStatus(profileId, { maxLoad: draftMaxLoad }, accessToken ?? undefined);
+      await refetchProfile();
+      setEditingCapacity(false);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCancelCapacity = () => {
+    setDraftMaxLoad(profile?.staffStatus?.maxLoad ?? 5);
+    setEditingCapacity(false);
   };
 
   if (sessionLoading || loading) return <PageSpinner />;
@@ -71,7 +98,7 @@ export default function StaffProfilePage() {
   const myAccountUrl = process.env.NEXT_PUBLIC_WSO2_MYACCOUNT_URL;
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Staff Profile</h1>
         <p className="text-slate-400 text-sm mt-1">Manage your availability and ticket categories.</p>
@@ -83,7 +110,7 @@ export default function StaffProfilePage() {
           <Card>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-2xl font-bold text-blue-400">
-                {profile.firstName[0]}{profile.lastName[0]}
+                {profile.firstName?.[0] ?? '?'}{profile.lastName?.[0] ?? ''}
               </div>
               <div>
                 <p className="text-lg font-semibold text-slate-100">
@@ -126,21 +153,44 @@ export default function StaffProfilePage() {
 
           {/* Categories */}
           <Card>
-            <CardTitle className="mb-1">Ticket Categories</CardTitle>
-            <CardDescription className="mb-4">Select which types of tickets you can handle.</CardDescription>
+            <div className="flex items-center justify-between mb-1">
+              <CardTitle>Ticket Categories</CardTitle>
+              {!editingCategories && (
+                <button
+                  onClick={() => setEditingCategories(true)}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            <CardDescription className="mb-4">
+              {editingCategories
+                ? 'Select categories then click Save.'
+                : 'The types of tickets you are assigned to handle.'}
+            </CardDescription>
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((cat) => {
-                const active = ss?.categories?.includes(cat) ?? false;
+                const active = editingCategories
+                  ? draftCategories.includes(cat)
+                  : ss?.categories?.includes(cat) ?? false;
                 return (
                   <button
                     key={cat}
-                    onClick={() => handleToggleCategory(cat)}
-                    disabled={saving}
+                    onClick={() => {
+                      if (!editingCategories) return;
+                      setDraftCategories((prev) =>
+                        prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+                      );
+                    }}
+                    disabled={!editingCategories}
                     className={[
                       'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
                       active
                         ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                        : 'bg-slate-700/40 text-slate-400 border-slate-600/60 hover:bg-slate-700',
+                        : 'bg-slate-700/40 text-slate-400 border-slate-600/60',
+                      editingCategories && !active ? 'hover:bg-slate-700' : '',
+                      !editingCategories ? 'cursor-default' : 'cursor-pointer',
                     ].join(' ')}
                   >
                     {cat}
@@ -148,32 +198,82 @@ export default function StaffProfilePage() {
                 );
               })}
             </div>
+            {editingCategories && (
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={handleCancelCategories}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCategories}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            )}
           </Card>
 
           {/* Capacity */}
           <Card>
-            <CardTitle className="mb-1">Capacity</CardTitle>
+            <div className="flex items-center justify-between mb-1">
+              <CardTitle>Capacity</CardTitle>
+              {!editingCapacity && (
+                <button
+                  onClick={() => setEditingCapacity(true)}
+                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-medium"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
             <CardDescription className="mb-4">
-              Current load: {ss?.currentLoad ?? 0} / {ss?.maxLoad ?? 5} tickets
+              Current load: {ss?.currentLoad ?? 0} / {editingCapacity ? draftMaxLoad : (ss?.maxLoad ?? 5)} tickets
             </CardDescription>
             <div className="flex flex-wrap gap-2 items-center">
               <span className="text-sm text-slate-400">Max tickets:</span>
               {[2, 5, 10, 15, 20].map((n) => (
                 <button
                   key={n}
-                  onClick={() => handleCapacityChange(n)}
-                  disabled={saving}
+                  onClick={() => {
+                    if (!editingCapacity) return;
+                    setDraftMaxLoad(n);
+                  }}
+                  disabled={!editingCapacity}
                   className={[
                     'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
-                    ss?.maxLoad === n
+                    (editingCapacity ? draftMaxLoad : ss?.maxLoad) === n
                       ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                      : 'bg-slate-700/40 text-slate-400 border-slate-600/60 hover:bg-slate-700',
+                      : 'bg-slate-700/40 text-slate-400 border-slate-600/60',
+                    editingCapacity ? 'cursor-pointer hover:bg-slate-700' : 'cursor-default',
                   ].join(' ')}
                 >
                   {n}
                 </button>
               ))}
             </div>
+            {editingCapacity && (
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={handleCancelCapacity}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCapacity}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            )}
           </Card>
 
           {myAccountUrl && (

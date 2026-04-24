@@ -7,6 +7,7 @@ import {
   ticketReplyTemplate,
   ticketClosedTemplate,
 } from '../email/email.templates';
+import { UserServiceClient } from '../http-clients/user-service.client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly userClient: UserServiceClient,
     configService: ConfigService,
   ) {
     this.appBaseUrl = configService.get<string>('APP_BASE_URL') ?? 'http://localhost:3000';
@@ -27,13 +29,13 @@ export class NotificationsService {
   // ----------------------------------------------------------------
 
   async handleTicketCreated(payload: {
-    ticketId:       string;
-    title:          string;
-    category:       string;
-    priority:       string;
-    createdBy:      string;
-    creatorEmail:   string;
+    ticketId:  string;
+    title:     string;
+    category:  string;
+    priority:  string;
+    createdBy: string;
   }): Promise<void> {
+    const { email: creatorEmail } = await this.userClient.getUserProfile(payload.createdBy);
     const trackingUrl = `${this.appBaseUrl}/tickets/${payload.ticketId}`;
     const template = ticketCreatedTemplate({
       ticketId:    payload.ticketId,
@@ -45,7 +47,7 @@ export class NotificationsService {
 
     await this.sendAndLog({
       ticketId:        payload.ticketId,
-      recipientEmail:  payload.creatorEmail,
+      recipientEmail:  creatorEmail,
       recipientUserId: payload.createdBy,
       type:            NotificationType.TICKET_CREATED,
       subject:         template.subject,
@@ -54,15 +56,14 @@ export class NotificationsService {
   }
 
   async handleTicketUpdated(payload: {
-    ticketId:       string;
-    title:          string;
-    lastMessage:    string;
-    createdBy:      string;
-    creatorEmail:   string;
+    ticketId:    string;
+    title:       string;
+    lastMessage: string;
+    createdBy:   string;
   }): Promise<void> {
-    // Only send reply notification if there's an actual message
     if (!payload.lastMessage) return;
 
+    const { email: creatorEmail } = await this.userClient.getUserProfile(payload.createdBy);
     const trackingUrl = `${this.appBaseUrl}/tickets/${payload.ticketId}`;
     const template = ticketReplyTemplate({
       ticketId:    payload.ticketId,
@@ -73,7 +74,7 @@ export class NotificationsService {
 
     await this.sendAndLog({
       ticketId:        payload.ticketId,
-      recipientEmail:  payload.creatorEmail,
+      recipientEmail:  creatorEmail,
       recipientUserId: payload.createdBy,
       type:            NotificationType.TICKET_REPLY,
       subject:         template.subject,
@@ -82,11 +83,11 @@ export class NotificationsService {
   }
 
   async handleTicketClosed(payload: {
-    ticketId:      string;
-    title:         string;
-    createdBy:     string;
-    creatorEmail:  string;
+    ticketId:  string;
+    title:     string;
+    createdBy: string;
   }): Promise<void> {
+    const { email: creatorEmail } = await this.userClient.getUserProfile(payload.createdBy);
     const trackingUrl = `${this.appBaseUrl}/tickets/${payload.ticketId}`;
     const template = ticketClosedTemplate({
       ticketId:    payload.ticketId,
@@ -96,7 +97,7 @@ export class NotificationsService {
 
     await this.sendAndLog({
       ticketId:        payload.ticketId,
-      recipientEmail:  payload.creatorEmail,
+      recipientEmail:  creatorEmail,
       recipientUserId: payload.createdBy,
       type:            NotificationType.TICKET_CLOSED,
       subject:         template.subject,

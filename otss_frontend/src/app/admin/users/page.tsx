@@ -7,6 +7,7 @@ import Select from '@/components/ui/Select';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import { PageSpinner } from '@/components/ui/Spinner';
+import { useAppSession } from '@/components/AppSessionContext';
 
 const roleOptions = [
   { value: '', label: 'All Roles' },
@@ -22,17 +23,19 @@ const roleBadgeVariant = {
 } as const;
 
 export default function AdminUsersPage() {
+  const { accessToken, isLoading: sessionLoading } = useAppSession();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [roleFilter, setRoleFilter] = useState('');
 
   useEffect(() => {
-    listProfiles()
+    if (sessionLoading || !accessToken) return;
+    listProfiles(undefined, accessToken)
       .then(setProfiles)
       .finally(() => setLoading(false));
-  }, []);
+  }, [sessionLoading, accessToken]);
 
-  if (loading) return <PageSpinner />;
+  if (sessionLoading || loading) return <PageSpinner />;
 
   const filtered = profiles.filter((p) => !roleFilter || p.role === roleFilter);
 

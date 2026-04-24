@@ -10,23 +10,26 @@ import Card, { CardTitle } from '@/components/ui/Card';
 import { TicketStatusBadge, PriorityBadge } from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { PageSpinner } from '@/components/ui/Spinner';
+import { useAppSession } from '@/components/AppSessionContext';
 
 export default function AdminDashboardPage() {
+  const { accessToken, isLoading: sessionLoading } = useAppSession();
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [recent, setRecent] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (sessionLoading || !accessToken) return;
     Promise.all([
-      getQueueStats(),
-      listTickets({ limit: 8 }),
+      getQueueStats(accessToken),
+      listTickets({ limit: 8 }, accessToken),
     ]).then(([s, t]) => {
       setStats(s);
       setRecent(t);
     }).finally(() => setLoading(false));
-  }, []);
+  }, [sessionLoading, accessToken]);
 
-  if (loading) return <PageSpinner />;
+  if (sessionLoading || loading) return <PageSpinner />;
 
   const statCards = stats
     ? [

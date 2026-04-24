@@ -55,3 +55,21 @@ export interface ProfileListParams {
   email?: string;
   role?: UserRole;
 }
+
+export interface StaffStatusWithProfile {
+  id: string;
+  profileId: string;
+  isOnline: boolean;
+  currentLoad: number;
+  maxLoad: number;
+  categories: TicketCategory[];
+  updatedAt: string;
+  profile: Profile;
+}
+
+export interface StaffListParams {
+  category?: TicketCategory;
+  isOnline?: boolean;
+  hasCapacity?: boolean;
+  limit?: number;
+}
