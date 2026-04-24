@@ -205,10 +205,6 @@ deploymentToml:
       autoUnlockAfter: 5
 
   extraConfigs: |
-    [server]
-    hostname = "iam.raizuraiprojects.dpdns.org"
-    internal_hostname = "wso2-is-identity-server.otss.svc.cluster.local"
-
     [transport.https.properties]
     proxyPort = 443
 
