@@ -125,6 +125,19 @@ export class Wso2ScimService {
     }
   }
 
+  async getUserGroups(userId: string): Promise<string[]> {
+    const token = await this.getAccessToken();
+    const response = await firstValueFrom(
+      this.httpService.get(`${this.baseUrl}/scim2/Users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { attributes: 'groups' },
+      }),
+    );
+
+    const groups = (response.data as { groups?: { display: string }[] }).groups ?? [];
+    return groups.map((g) => g.display).filter(Boolean);
+  }
+
   async deleteUser(wso2Id: string): Promise<void> {
     try {
       const token = await this.getAccessToken();
