@@ -45,7 +45,7 @@ export class Wso2ScimService {
     const response = await firstValueFrom(
       this.httpService.post(
         `${this.baseUrl}/oauth2/token`,
-        new URLSearchParams({ grant_type: 'client_credentials', scope: 'internal_user_mgt_create internal_user_mgt_delete internal_group_mgt_view internal_group_mgt_update' }),
+        new URLSearchParams({ grant_type: 'client_credentials', scope: 'internal_user_mgt_create internal_user_mgt_view internal_user_mgt_delete internal_group_mgt_view internal_group_mgt_update' }),
         {
           headers: {
             Authorization: `Basic ${credentials}`,
