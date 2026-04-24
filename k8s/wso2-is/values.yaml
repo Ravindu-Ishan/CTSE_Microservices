@@ -205,15 +205,6 @@ deploymentToml:
       autoUnlockAfter: 5
 
   extraConfigs: |
-    [transport.https.properties]
-    proxyPort = 443
-
-    [console]
-    callback_url = "https://iam.raizuraiprojects.dpdns.org/console"
-
-    [myaccount]
-    callback_url = "https://iam.raizuraiprojects.dpdns.org/myaccount"
-
     [[resource.access_control]]
     context="(.*)/scim2/Me"
     secure=true
